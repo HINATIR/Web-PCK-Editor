@@ -1,0 +1,4709 @@
+<!--
+    Web PCK Editor
+  
+    PCKファイル（Minecraft用フォーマット）をブラウザで編集するツールです。
+  
+    使用技術:
+    - HTML5
+    - CSS3
+    - JavaScript (ES6+)
+  
+    ライセンス:
+    このプロジェクトはGNU General Public License v3.0 (GPL-3.0)の下で公開されています。
+    詳細はLICENSEファイルを参照してください。
+  
+    GitHub: https://github.com/HINATIR/Web-PCK-Editor
+  
+    参考資料・引用:
+    - PCK-Studio (GPL-3.0 License)
+        https://github.com/LCERD/PCK-Studio
+        PCKファイルフォーマットと機能仕様の参考資料
+        Authors: PhoenixARC, MayN-L, NessieHax, EternalModz
+  
+    - OMI-Filetype-Library (GPL-3.0 License)
+        https://github.com/LCERD/OMI-Filetype-Library
+        PCKファイルのパース仕様参考資料
+        Authors: NessieHax, PhoenixARC, MayN-L, Bagietas
+-->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEB PCK Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: rgba(0, 122, 204, 0.3);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            touch-action: pan-y;
+        }
+
+        body.modal-open {
+            overflow: hidden;
+        }
+
+        /* メニューバー */
+        .menu-bar {
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            align-items: center;
+            padding: 0;
+            height: 35px;
+            user-select: none;
+            position: relative;
+        }
+
+        .mobile-menu-toggle {
+            display: none;
+            padding: 8px 12px;
+            cursor: pointer;
+            color: #cccccc;
+            font-size: 18px;
+            background: none;
+            border: none;
+            transition: background 0.2s;
+        }
+
+        .mobile-menu-toggle:hover {
+            background: #3e3e42;
+        }
+
+        .menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            color: #cccccc;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .menu-item:hover {
+            background: #3e3e42;
+        }
+
+        .menu-item:active {
+            background: #007acc;
+            color: white;
+        }
+
+        /* ファイル情報バー */
+        .info-bar {
+            background: #007acc;
+            color: white;
+            padding: 8px 15px;
+            font-size: 12px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 32px;
+        }
+
+        .info-bar.active {
+            display: flex;
+        }
+
+        .info-left, .info-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .info-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        /* メインコンテナ */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* 左サイドバー（アセット一覧） */
+        .sidebar {
+            width: 320px;
+            background: #252526;
+            border-right: 1px solid #3e3e42;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 12px 15px;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            font-weight: 600;
+            font-size: 12px;
+            color: #cccccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .asset-count {
+            color: #858585;
+            font-size: 11px;
+            font-weight: normal;
+        }
+
+        .asset-list {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .sidebar-action-button {
+            padding: 12px 10px;
+            border-top: 1px solid #3e3e42;
+            background: #252526;
+        }
+
+        .sidebar-action-button .btn-action {
+            width: 100%;
+        }
+
+        .asset-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid #2d2d30;
+            cursor: pointer;
+            transition: background 0.15s;
+            position: relative;
+        }
+
+        .asset-item:hover {
+            background: #2a2d2e;
+        }
+
+        .asset-item:active {
+            background: #333638;
+        }
+
+        .asset-item.selected {
+            background: #094771;
+        }
+
+        .asset-item.selected::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: #007acc;
+        }
+
+        .asset-item.crash-warning {
+            background: rgba(211, 47, 47, 0.15);
+            border-left: 3px solid #d32f2f;
+        }
+
+        .asset-item.crash-warning:hover {
+            background: rgba(211, 47, 47, 0.25);
+        }
+
+        .asset-item.crash-warning.selected {
+            background: rgba(211, 47, 47, 0.35);
+        }
+
+        .asset-delete-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #d32f2f;
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.2s, background 0.2s;
+        }
+
+        .asset-item:hover .asset-delete-btn {
+            opacity: 1;
+        }
+
+        .asset-delete-btn:hover {
+            background: #ff5252;
+        }
+
+        .asset-filename {
+            color: #d4d4d4;
+            font-size: 13px;
+            margin-bottom: 4px;
+            word-break: break-all;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .asset-directory {
+            color: #7d7d7d;
+            font-size: 12px;
+            opacity: 0.7;
+            font-weight: 400;
+        }
+
+        .asset-file {
+            color: #d4d4d4;
+            font-weight: 500;
+        }
+
+        .asset-type-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+            width: 20px;
+            text-align: center;
+        }
+
+        .asset-info {
+            font-size: 11px;
+            color: #858585;
+        }
+
+        /* ツリービュー - フォルダ */
+        .asset-folder {
+            margin-bottom: 0;
+        }
+
+        .asset-folder-toggle {
+            width: 100%;
+            padding: 8px 12px;
+            background: #252526;
+            border: none;
+            border-bottom: 1px solid #3e3e42;
+            color: #d4d4d4;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+            font-family: inherit;
+        }
+
+        .asset-folder-toggle:hover {
+            background: #2d2d30;
+        }
+
+        .asset-folder-toggle:active {
+            background: #007acc;
+        }
+
+        .asset-folder-content {
+            display: none;
+            margin-left: 12px;
+            border-left: 1px solid #3e3e42;
+            padding-left: 0;
+        }
+
+        .asset-folder.expanded .asset-folder-content {
+            display: block;
+        }
+
+        /* コンテキストメニュー */
+        .context-menu {
+            position: fixed;
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            z-index: 10000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            min-width: 180px;
+        }
+
+        .context-menu.hidden {
+            display: none;
+        }
+
+        .context-menu-item {
+            padding: 8px 12px;
+            color: #d4d4d4;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.15s;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-family: inherit;
+        }
+
+        .context-menu-item:hover {
+            background: #2d2d30;
+        }
+
+        .context-menu-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .context-menu-item.disabled:hover {
+            background: transparent;
+        }
+
+        .context-menu-divider {
+            height: 1px;
+            background: #3e3e42;
+            margin: 4px 0;
+        }
+
+        /* 右側コンテンツエリア */
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* プレビューエリア（上半分） */
+        .preview-area {
+            flex: 1;
+            background: #1e1e1e;
+            border-bottom: 1px solid #3e3e42;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .preview-header {
+            padding: 12px 15px;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            font-weight: 600;
+            font-size: 12px;
+            color: #cccccc;
+        }
+
+        .preview-content {
+            flex: 1;
+            padding: 15px;
+            overflow: auto;
+        }
+
+        /* 詳細エリア（下半分） */
+        .details-area {
+            height: 300px;
+            background: #252526;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .details-header {
+            padding: 12px 15px;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            font-weight: 600;
+            font-size: 12px;
+            color: #cccccc;
+        }
+
+        .details-content {
+            flex: 1;
+            padding: 15px;
+            overflow: auto;
+        }
+
+        .detail-row {
+            display: flex;
+            padding: 8px 0;
+            font-size: 12px;
+            border-bottom: 1px solid #2d2d30;
+        }
+
+        .detail-label {
+            min-width: 110px;
+            color: #569cd6;
+            font-weight: 600;
+        }
+
+        .detail-value {
+            color: #d4d4d4;
+            word-break: break-all;
+            flex: 1;
+        }
+
+        .properties-section {
+            margin-top: 15px;
+        }
+
+        .properties-title {
+            color: #569cd6;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .property-item {
+            padding: 8px 0;
+            font-size: 12px;
+            border-bottom: 1px solid #2d2d30;
+            display: grid;
+            grid-template-columns: 150px 1fr 30px;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .property-delete-btn {
+            background: #d32f2f;
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: background 0.2s;
+            padding: 0;
+        }
+
+        .property-delete-btn:hover {
+            background: #ff5252;
+        }
+
+        .property-key {
+            color: #9cdcfe;
+            font-weight: 600;
+        }
+
+        .property-key-input {
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            color: #9cdcfe;
+            padding: 4px 8px;
+            border-radius: 2px;
+            font-size: 12px;
+            font-weight: 600;
+            width: 100%;
+        }
+
+        .property-key-input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .property-value-input {
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            color: #ce9178;
+            padding: 4px 8px;
+            border-radius: 2px;
+            font-size: 12px;
+            width: 100%;
+        }
+
+        .property-value-input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .asset-action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #2d2d30;
+        }
+
+        .btn-asset-action {
+            padding: 6px 14px;
+            background: #0e639c;
+            border: none;
+            color: white;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .btn-asset-action:hover {
+            background: #1177bb;
+        }
+
+        .btn-asset-action:active {
+            background: #0d5a8f;
+            transform: scale(0.98);
+        }
+
+        .btn-asset-action:disabled {
+            background: #3e3e42;
+            color: #858585;
+            cursor: not-allowed;
+        }
+
+        .loc-entry-item {
+            background: #2d2d30;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .loc-entry-key {
+            color: #4ec9b0;
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .loc-entry-values {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .loc-value-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .loc-lang-label {
+            min-width: 50px;
+            color: #858585;
+            font-size: 11px;
+        }
+
+        .loc-value-input {
+            flex: 1;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            color: #cccccc;
+            padding: 4px 8px;
+            border-radius: 2px;
+            font-size: 12px;
+        }
+
+        .loc-value-input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .loc-table-editable {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .loc-table-editable th {
+            background: #2d2d30;
+            color: #cccccc;
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #3e3e42;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .loc-table-editable td {
+            padding: 4px;
+            border: 1px solid #3e3e42;
+        }
+
+        .loc-table-editable .key-cell {
+            color: #4ec9b0;
+            font-weight: 600;
+            background: #252526;
+            padding: 8px;
+        }
+
+        .loc-table-editable .value-cell {
+            background: #1e1e1e;
+        }
+
+        .loc-table-editable input {
+            width: 100%;
+            background: transparent;
+            border: 1px solid transparent;
+            color: #cccccc;
+            padding: 6px 8px;
+            font-size: 12px;
+        }
+
+        .loc-table-editable input:focus {
+            outline: none;
+            border-color: #007acc;
+            background: #2d2d30;
+        }
+
+        .loc-editor-container {
+            display: flex;
+            height: 100%;
+            gap: 10px;
+        }
+
+        .loc-keys-panel {
+            width: 300px;
+            background: #252526;
+            border: 1px solid #3e3e42;
+            overflow-y: auto;
+        }
+
+        .loc-key-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #2d2d30;
+            color: #4ec9b0;
+            font-size: 12px;
+            font-family: 'Consolas', monospace;
+        }
+
+        .loc-key-item:hover {
+            background: #2d2d30;
+        }
+
+        .loc-key-item.selected {
+            background: #094771;
+            border-left: 3px solid #007acc;
+        }
+
+        .loc-detail-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .loc-bulk-replace {
+            background: #2d2d30;
+            border: 1px solid #3e3e42;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .loc-bulk-replace-title {
+            color: #cccccc;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .loc-bulk-replace-input {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .loc-bulk-replace-input input {
+            flex: 1;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            color: #cccccc;
+            padding: 6px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        .loc-bulk-replace-input input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .loc-bulk-replace-btn {
+            background: #0e639c;
+            border: none;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .loc-bulk-replace-btn:hover {
+            background: #1177bb;
+        }
+
+        .loc-values-container {
+            flex: 1;
+            overflow-y: auto;
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            padding: 12px;
+        }
+
+        .loc-value-edit-row {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .loc-lang-label-edit {
+            color: #858585;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .loc-value-edit-input {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            color: #cccccc;
+            padding: 6px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            width: 100%;
+        }
+
+        .loc-value-edit-input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .loc-no-selection {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #858585;
+            font-size: 13px;
+        }
+
+        /* プレビュー用スタイル */
+        .preview-hex {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #d4d4d4;
+            background: #1e1e1e;
+            white-space: pre;
+        }
+
+        .empty-message {
+            text-align: center;
+            color: #6a737d;
+            padding: 60px 20px;
+            font-size: 14px;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        /* ウェルカム画面 */
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #858585;
+        }
+
+        .welcome-icon {
+            font-size: 80px;
+            margin-bottom: 25px;
+            opacity: 0.4;
+        }
+
+        .welcome-text {
+            font-size: 18px;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .welcome-hint {
+            font-size: 13px;
+            opacity: 0.7;
+        }
+
+        /* ファイル入力 */
+        #fileInput {
+            display: none;
+        }
+
+        /* スクロールバー */
+        ::-webkit-scrollbar {
+            width: 14px;
+            height: 14px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #424242;
+            border: 3px solid #1e1e1e;
+            border-radius: 7px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+
+        /* LOCテーブルスタイル */
+        .loc-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            background: #1a1a1a;
+        }
+
+        .loc-table thead tr {
+            background: #2a2a2a;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .loc-table th {
+            border: 1px solid #444;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .loc-table td {
+            border: 1px solid #444;
+            padding: 8px;
+            background: #1a1a1a;
+        }
+
+        .loc-table .key-cell {
+            font-family: 'Consolas', monospace;
+            color: #4FC3F7;
+        }
+
+        .loc-table .value-cell {
+            color: #ddd;
+        }
+
+        .loc-stats {
+            margin-top: 12px;
+            color: #888;
+            font-size: 11px;
+        }
+
+        /* ボタンスタイル */
+        .details-header {
+            padding: 12px 15px;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            font-weight: 600;
+            font-size: 12px;
+            color: #cccccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .details-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-action {
+            padding: 6px 12px;
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-action:hover {
+            background: #005fa3;
+        }
+
+        .btn-action:active {
+            background: #004578;
+        }
+
+        /* モーダルダイアログスタイル */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-dialog {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 5px;
+            max-width: 500px;
+            width: 90vw;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            padding: 12px 15px;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            font-weight: 600;
+            color: #cccccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+        }
+
+        .modal-close:hover {
+            color: #ccc;
+        }
+
+        .modal-content {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .modal-footer {
+            padding: 12px 15px;
+            background: #2d2d30;
+            border-top: 1px solid #3e3e42;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-primary {
+            padding: 8px 16px;
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-primary:hover {
+            background: #005fa3;
+        }
+
+        .btn-primary:active {
+            background: #004578;
+            transform: scale(0.98);
+        }
+
+        .btn-secondary {
+            padding: 8px 16px;
+            background: #3e3e42;
+            color: #cccccc;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-secondary:hover {
+            background: #4a4a4a;
+        }
+
+        .btn-secondary:active {
+            background: #555555;
+            transform: scale(0.98);
+        }
+
+        .skin-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #1a1a1a;
+            border: 1px solid #3e3e42;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .skin-item:hover {
+            background: #2a2a2a;
+            border-color: #007acc;
+        }
+
+        .skin-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .skin-item.disabled:hover {
+            background: #1a1a1a;
+            border-color: #3e3e42;
+        }
+
+        .skin-item-name {
+            color: #d4d4d4;
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .skin-item-dir {
+            color: #7d7d7d;
+            font-size: 12px;
+            opacity: 0.7;
+            font-weight: 400;
+        }
+
+        .skin-item-file {
+            color: #d4d4d4;
+            font-weight: 600;
+        }
+
+        .skin-item-info {
+            color: #888;
+            font-size: 11px;
+        }
+
+        /* フォーム入力スタイル */
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-label {
+            display: block;
+            color: #d4d4d4;
+            font-size: 12px;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 8px;
+            background: #1a1a1a;
+            border: 1px solid #3e3e42;
+            color: #d4d4d4;
+            font-size: 12px;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #007acc;
+            background: #252526;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 8px;
+            background: #1a1a1a;
+            border: 1px solid #3e3e42;
+            color: #d4d4d4;
+            font-size: 12px;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 200px;
+            border: 1px solid #3e3e42;
+            border-radius: 3px;
+            margin: 10px 0;
+            image-rendering: pixelated;
+        }
+
+        .save-dialog-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .save-dialog {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 6px;
+            padding: 25px;
+            min-width: 450px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .save-dialog-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #cccccc;
+            margin-bottom: 20px;
+        }
+
+        .save-dialog-field {
+            margin-bottom: 18px;
+        }
+
+        .save-dialog-label {
+            display: block;
+            font-size: 12px;
+            color: #cccccc;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .save-dialog-input {
+            width: 100%;
+            padding: 8px 10px;
+            background: #3c3c3c;
+            border: 1px solid #3e3e42;
+            color: #cccccc;
+            border-radius: 3px;
+            font-family: inherit;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+
+        .save-dialog-input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .save-dialog-radio-group {
+            display: flex;
+            gap: 20px;
+        }
+
+        .save-dialog-radio {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .save-dialog-radio input[type="radio"] {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+
+        .save-dialog-radio label {
+            color: #cccccc;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .save-dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        .save-dialog-btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .save-dialog-btn-primary {
+            background: #007acc;
+            color: white;
+        }
+
+        .save-dialog-btn-primary:hover {
+            background: #005a9e;
+        }
+
+        .save-dialog-btn-secondary {
+            background: #3e3e42;
+            color: #cccccc;
+        }
+
+        .save-dialog-btn-secondary:hover {
+            background: #505050;
+        }
+
+        /* モバイル対応 */
+        @media (max-width: 768px) {
+            .mobile-menu-toggle {
+                display: block;
+            }
+
+            .menu-bar {
+                height: 44px;
+            }
+
+            .menu-item {
+                padding: 8px 10px;
+                font-size: 12px;
+            }
+
+            .info-bar {
+                flex-wrap: wrap;
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+
+            .info-left, .info-right {
+                gap: 8px;
+            }
+
+            .info-item {
+                gap: 3px;
+            }
+
+            .sidebar {
+                position: absolute;
+                left: -320px;
+                top: 0;
+                bottom: 0;
+                z-index: 100;
+                transition: left 0.3s ease;
+                box-shadow: 2px 0 8px rgba(0, 0, 0, 0.5);
+            }
+
+            .sidebar.mobile-open {
+                left: 0;
+            }
+
+            .sidebar-header {
+                padding: 10px 12px;
+                font-size: 11px;
+            }
+
+            .asset-count {
+                font-size: 10px;
+            }
+
+            .asset-item {
+                padding: 12px 12px;
+            }
+
+            .asset-filename {
+                font-size: 14px;
+            }
+
+            .asset-type-icon {
+                font-size: 18px;
+            }
+
+            .asset-delete-btn {
+                opacity: 1;
+                right: 8px;
+            }
+
+            .content-area {
+                width: 100%;
+            }
+
+            .preview-area {
+                min-height: 40vh;
+            }
+
+            .details-area {
+                height: auto;
+                min-height: 200px;
+                max-height: 40vh;
+            }
+
+            .preview-header, .details-header {
+                padding: 10px 12px;
+                font-size: 11px;
+            }
+
+            .preview-content, .details-content {
+                padding: 12px;
+            }
+
+            .btn-action {
+                padding: 8px 14px;
+                font-size: 12px;
+                touch-action: manipulation;
+            }
+
+            .btn-asset-action {
+                padding: 8px 16px;
+                font-size: 13px;
+                touch-action: manipulation;
+            }
+
+            .modal-dialog {
+                width: 95vw;
+                max-width: none;
+            }
+
+            .save-dialog {
+                min-width: auto;
+                width: 90vw;
+                padding: 20px;
+            }
+
+            .save-dialog-radio-group {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .property-item {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .property-delete-btn {
+                justify-self: end;
+            }
+
+            .loc-editor-container {
+                flex-direction: column;
+            }
+
+            .loc-keys-panel {
+                width: 100%;
+                max-height: 200px;
+            }
+
+            .form-input, .form-select {
+                font-size: 16px;
+            }
+
+            .save-dialog-input {
+                font-size: 16px;
+            }
+
+            .property-key-input, .property-value-input {
+                font-size: 16px;
+            }
+
+            .loc-value-input, .loc-value-edit-input {
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .menu-item:not(:first-child) {
+                padding: 8px 6px;
+                font-size: 11px;
+            }
+
+            .info-bar {
+                font-size: 10px;
+            }
+
+            .sidebar {
+                width: 280px;
+                left: -280px;
+            }
+
+            .asset-filename {
+                font-size: 13px;
+            }
+
+            .detail-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .detail-label {
+                min-width: auto;
+                margin-bottom: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- メニューバー -->
+    <div class="menu-bar">
+        <button class="mobile-menu-toggle" onclick="viewer.toggleSidebar()" aria-label="メニュー">☰</button>
+        <div class="menu-item" onclick="viewer.showNewPackageDialog()">📄 新規作成</div>
+        <div class="menu-item" onclick="viewer.openFile()">📁 ファイルを開く</div>
+        <div class="menu-item" onclick="viewer.saveFile()" id="menuSave" style="opacity: 0.5; pointer-events: none;">💾 保存</div>
+        <div class="menu-item" onclick="viewer.closeFile()" id="menuClose" style="opacity: 0.5; pointer-events: none;">✕ 閉じる</div>
+    </div>
+
+    <!-- 新規作成ダイアログ -->
+    <div class="save-dialog-overlay" id="newPackageDialogOverlay">
+        <div class="save-dialog">
+            <div class="save-dialog-title">📄 新しいPCKパッケージを作成</div>
+            
+            <div class="save-dialog-field">
+                <label class="save-dialog-label">パック名</label>
+                <input type="text" class="save-dialog-input" id="newPackageName" placeholder="my_pack">
+            </div>
+            
+            <div class="save-dialog-field">
+                <label class="save-dialog-label">PACKID</label>
+                <input type="text" class="save-dialog-input" id="newPackagePACKID" placeholder="0-16777215 (0xFFFFFF)最大値" value="0">
+            </div>
+            
+            <div class="save-dialog-field">
+                <label class="save-dialog-label">エンディアン</label>
+                <div class="save-dialog-radio-group">
+                    <div class="save-dialog-radio">
+                        <input type="radio" name="newPackageEndian" value="little" id="newPackageEndianLittle" checked>
+                        <label for="newPackageEndianLittle">Little Endian (PS4/PSVita/Switch)</label>
+                    </div>
+                    <div class="save-dialog-radio">
+                        <input type="radio" name="newPackageEndian" value="big" id="newPackageEndianBig">
+                        <label for="newPackageEndianBig">Big Endian (PS3/Xbox360/WiiU)</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="save-dialog-buttons">
+                <button class="save-dialog-btn save-dialog-btn-secondary" onclick="viewer.closeNewPackageDialog()">キャンセル</button>
+                <button class="save-dialog-btn save-dialog-btn-primary" onclick="viewer.createNewPackage()">作成</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 保存ダイアログ -->
+    <div class="save-dialog-overlay" id="saveDialogOverlay">
+        <div class="save-dialog">
+            <div class="save-dialog-title">💾 PCKファイルを保存</div>
+            
+            <div class="save-dialog-field">
+                <label class="save-dialog-label">エンディアン</label>
+                <div class="save-dialog-radio-group">
+                    <div class="save-dialog-radio">
+                        <input type="radio" name="endian" value="little" id="endianLittle" checked>
+                        <label for="endianLittle">Little Endian (PS4/PSVita/Switch)</label>
+                    </div>
+                    <div class="save-dialog-radio">
+                        <input type="radio" name="endian" value="big" id="endianBig">
+                        <label for="endianBig">Big Endian (PS3/Xbox360/WiiU)</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="save-dialog-buttons">
+                <button class="save-dialog-btn save-dialog-btn-secondary" onclick="viewer.closeSaveDialog()">キャンセル</button>
+                <button class="save-dialog-btn save-dialog-btn-primary" onclick="viewer.confirmSave()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ファイル情報バー -->
+    <div class="info-bar" id="infoBar">
+        <div class="info-left">
+            <div class="info-item">
+                <span>📦</span>
+                <span id="infoFilename">-</span>
+            </div>
+            <div class="info-item">
+                <span>📊</span>
+                <span id="infoEndian" class="info-badge">-</span>
+            </div>
+            <div class="info-item">
+                <span>🎮</span>
+                <span id="infoPlatform">-</span>
+            </div>
+        </div>
+        <div class="info-right">
+            <div class="info-item">
+                <span>📁 <span id="infoAssetCount">0</span> アセット</span>
+            </div>
+            <div class="info-item">
+                <span>💾 <span id="infoTotalSize">0 B</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインコンテナ -->
+    <div class="main-container">
+        <!-- 左サイドバー（アセット一覧） -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                アセット一覧
+                <span class="asset-count" id="assetCountLabel">0 アセット</span>
+            </div>
+            <div class="asset-list" id="assetList">
+                <div class="welcome-screen">
+                    <div class="welcome-icon">📦</div>
+                    <div class="welcome-text">PCK ファイルを開く</div>
+                    <div class="welcome-hint">「ファイルを開く」をクリック</div>
+                </div>
+            </div>
+            <div class="sidebar-action-button">
+                <button class="btn-action" onclick="viewer.openSkinAddDialog()">➕ ADD SKIN</button>
+            </div>
+        </div>
+
+        <!-- コンテキストメニュー -->
+        <div class="context-menu hidden" id="contextMenu"></div>
+
+        <!-- 右側コンテンツエリア -->
+        <div class="content-area">
+            <!-- プレビューエリア（上半分） -->
+            <div class="preview-area">
+                <div class="preview-header" id="previewHeader">プレビュー</div>
+                <div class="preview-content" id="previewContent">
+                    <div class="empty-message">
+                        <div class="empty-icon">👈</div>
+                        左側からアセットを選択してください
+                    </div>
+                </div>
+            </div>
+
+            <!-- 詳細エリア（下半分） -->
+            <div class="details-area">
+                <div class="details-header">
+                    <span>アセット詳細</span>
+                </div>
+                <div class="details-content" id="detailsContent">
+                    <div class="empty-message">
+                        <div class="empty-icon">ℹ️</div>
+                        アセット情報がここに表示されます
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- スキン選択ダイアログ -->
+    <div class="modal-overlay" id="skinModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span id="skinModalTitle">スキンを選択</span>
+                <button class="modal-close" onclick="viewer.closeSkinModal()">&times;</button>
+            </div>
+            <div class="modal-content" id="skinModalContent"></div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="viewer.closeSkinModal()">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- スキンインポートダイアログ -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <span>新しいスキンを追加</span>
+                <button class="modal-close" onclick="viewer.closeImportModal()">&times;</button>
+            </div>
+            <div class="modal-content">
+                <div class="form-group">
+                    <label class="form-label">スキン画像ファイル</label>
+                    <input type="file" id="skinFileInput" class="form-input" accept=".png" onchange="viewer.handleSkinFileSelect(this.files[0])" />
+                </div>
+                <div id="skinPreviewArea" style="display: none;">
+                    <img id="skinPreview" class="preview-image" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">スキン名（任意）</label>
+                    <input type="text" id="skinNameInput" class="form-input" placeholder="例: Custom Skin" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">テーマ名（任意）</label>
+                    <input type="text" id="skinThemeInput" class="form-input" placeholder="例: Adventure" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">スキンID</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="skinIdInput" class="form-input" placeholder="100000-99999998" maxlength="8" style="flex: 1;" />
+                        <button class="btn-action" onclick="viewer.generateSkinId()" style="white-space: nowrap;">🔄 Auto-Gen</button>
+                    </div>
+                    <div style="font-size: 11px; color: #888; margin-top: 4px;">
+                        自動生成（Auto-Gen）を使うと、既存スキンと重複しないIDが割り当てられます
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">モデルタイプ</label>
+                    <select id="skinModelInput" class="form-select">
+                        <option value="steve">Steve (0x00040000)</option>
+                        <option value="alex">Alex (0x00080000)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">マント画像ファイル（オプション）</label>
+                    <input type="file" id="capeFileInput" class="form-input" accept=".png" onchange="viewer.handleCapeFileSelect(this.files[0])" />
+                </div>
+                <div id="capePreviewArea" style="display: none;">
+                    <img id="capePreview" class="preview-image" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="viewer.closeImportModal()">キャンセル</button>
+                <button class="btn-primary" onclick="viewer.addSkinToPackage()">追加</button>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" accept=".pck" />
+    <input type="file" id="pngReplaceInput" accept=".png" style="display: none;" />
+
+    <script>
+        // =====================================================
+        // PCK パーサー
+        // =====================================================
+
+        class PckParser {
+            constructor(arrayBuffer) {
+                this.buffer = arrayBuffer;
+                this.view = new DataView(arrayBuffer);
+                this.offset = 0;
+                this.assets = [];
+                this.endianness = 'big';
+                this.logs = [];
+                this.platformInfo = '';
+                this.isLittleEndian = false;
+            }
+
+            log(message, type = 'info') {
+                console.log(message);
+                this.logs.push({ message, type });
+            }
+
+            canRead(bytes) {
+                return this.offset + bytes <= this.buffer.byteLength;
+            }
+
+            readByte() {
+                if (!this.canRead(1)) throw new Error(`RangeError: offset=${this.offset}`);
+                return this.view.getUint8(this.offset++);
+            }
+
+            readUint32(littleEndian = false) {
+                if (!this.canRead(4)) throw new Error(`RangeError: offset=${this.offset}`);
+                const value = this.view.getUint32(this.offset, littleEndian);
+                this.offset += 4;
+                return value;
+            }
+
+            readUint16(littleEndian = false) {
+                if (!this.canRead(2)) throw new Error(`RangeError: offset=${this.offset}`);
+                const value = this.view.getUint16(this.offset, littleEndian);
+                this.offset += 2;
+                return value;
+            }
+
+            readData(length) {
+                if (!this.canRead(length)) throw new Error(`RangeError: offset=${this.offset}, length=${length}`);
+                const data = new Uint8Array(this.buffer, this.offset, length);
+                this.offset += length;
+                return data;
+            }
+
+            parse() {
+                try {
+                    this.log('========================================');
+                    this.log('PCK ファイル解析開始（OMI PckFileReader 準拠）');
+                    this.log('========================================');
+                    this.log(`ファイルサイズ: ${this.buffer.byteLength} バイト\n`);
+
+                    if (this.buffer.byteLength < 12) {
+                        throw new Error('ファイルが小さすぎます');
+                    }
+
+                    // エンディアンネス検出
+                    const pckTypeBE = this.view.getUint32(0, false);
+                    const pckTypeLE = this.view.getUint32(0, true);
+                    
+                    let littleEndian = false;
+                    let pckType;
+                    
+                    this.log('🔍 エンディアンネス検出:');
+                    this.log(`   Big Endian として読むと: ${pckTypeBE}`);
+                    this.log(`   Little Endian として読むと: ${pckTypeLE}`);
+                    
+                    if (pckTypeBE > 0x00F00000) {
+                        // 大きすぎるのでLittle Endian
+                        littleEndian = true;
+                        pckType = pckTypeLE;
+                        this.log(`✅ Little Endian 確定`);
+                    } else {
+                        // 正常な値なのでBig Endian
+                        littleEndian = false;
+                        pckType = pckTypeBE;
+                        this.log(`✅ Big Endian 確定`);
+                    }
+
+                    this.log(`📦 PCK Type: ${pckType}`);
+                    
+                    // プラットフォーム情報を表示
+                    const platformInfo = this.getPlatformInfo(littleEndian);
+                    this.log(`🎮 プラットフォーム: ${platformInfo}`);
+                    this.log(`📊 エンディアン: ${littleEndian ? 'Little Endian (LE)' : 'Big Endian (BE)'}\n`);
+
+                    if (pckType < 3 || pckType > 20) {
+                        throw new Error(`PCK Type が無効: ${pckType} (有効範囲: 3-20)`);
+                    }
+                    
+                    // プラットフォーム情報を保存
+                    this.platformInfo = platformInfo;
+                    this.isLittleEndian = littleEndian;
+                    this.pckType = pckType;
+
+                    // 1. プロパティルックアップテーブル読み込み
+                    this.offset = 4;
+                    const { propertyList, hasVersionStr } = this.readLookUpTable(littleEndian);
+                    this.log(`📋 LUT読み込み完了: ${propertyList.length}個のプロパティ`);
+                    if (hasVersionStr) {
+                        this.log(`   ⚠️ XML_VERSION_STRING 検出`);
+                    }
+
+                    // 2. アセットエントリ読み込み
+                    this.log(`\n📂 アセットエントリ読み込み開始 (offset=0x${this.offset.toString(16)})`);
+                    const assetEntries = this.readAssetEntries(littleEndian);
+                    this.log(`✅ ${assetEntries.length}個のアセットエントリ読み込み完了\n`);
+
+                    // 3. アセットコンテンツ読み込み
+                    this.log(`💾 アセットコンテンツ読み込み開始 (offset=0x${this.offset.toString(16)})`);
+                    this.readAssetContents(assetEntries, propertyList, littleEndian);
+                    
+                    this.log(`\n✅ 解析完了: ${this.assets.length}個のアセット`);
+                    return this.assets;
+                } catch (error) {
+                    this.log(`💥 PCK パース失敗: ${error.message}`, 'error');
+                    console.error(error);
+                    return [];
+                }
+            }
+
+            readLookUpTable(littleEndian) {
+                const count = this.readUint32(littleEndian);
+                this.log(`   LUT エントリ数: ${count}`);
+                
+                const propertyList = [];
+                for (let i = 0; i < count; i++) {
+                    const index = this.readUint32(littleEndian);
+                    const value = this.readStringWithPadding(littleEndian);
+                    propertyList[index] = value;
+                }
+                
+                // XML_VERSION_STRING チェック
+                const hasVersionStr = propertyList.includes('XMLVERSION');
+                if (hasVersionStr) {
+                    const xmlVersion = this.readUint32(littleEndian);
+                    this.log(`   XML Version: ${xmlVersion}`);
+                }
+                
+                return { propertyList, hasVersionStr };
+            }
+
+            readAssetEntries(littleEndian) {
+                const assetCount = this.readUint32(littleEndian);
+                this.log(`   アセット数: ${assetCount}`);
+                
+                if (assetCount <= 0 || assetCount > 100000) {
+                    throw new Error(`アセット数が異常: ${assetCount}`);
+                }
+                
+                const entries = [];
+                for (let i = 0; i < assetCount; i++) {
+                    const assetSize = this.readUint32(littleEndian);
+                    const assetType = this.readUint32(littleEndian);
+                    const filename = this.readStringWithPadding(littleEndian).replace(/\\/g, '/');
+                    
+                    entries.push({ assetSize, assetType, filename });
+                }
+                
+                return entries;
+            }
+
+            readAssetContents(assetEntries, propertyList, littleEndian) {
+                for (let i = 0; i < assetEntries.length; i++) {
+                    const entry = assetEntries[i];
+                    
+                    try {
+                        // プロパティ読み込み
+                        const propertyCount = this.readUint32(littleEndian);
+                        const properties = [];
+                        
+                        for (let j = 0; j < propertyCount; j++) {
+                            const keyIndex = this.readUint32(littleEndian);
+                            const key = propertyList[keyIndex];
+                            const value = this.readStringWithPadding(littleEndian);
+                            properties.push({ key, value });
+                        }
+                        
+                        // データ読み込み
+                        const dataOffset = this.offset;
+                        const data = this.readData(entry.assetSize);
+                        
+                        this.assets.push({
+                            filename: entry.filename,
+                            typeCode: entry.assetType,
+                            dataSize: entry.assetSize,
+                            dataOffset,
+                            properties,
+                            data
+                        });
+                        
+                        this.log(`   ✅ [${i}] "${entry.filename}" 読み込み完了`);
+                    } catch (error) {
+                        this.log(`   ❌ [${i}] "${entry.filename}" 読み込み失敗: ${error.message}`, 'error');
+                    }
+                }
+            }
+
+            readStringWithPadding(littleEndian) {
+                const len = this.readUint32(littleEndian);
+                if (len < 0 || len > 100000) {
+                    throw new Error(`文字列長が異常: ${len}`);
+                }
+                
+                const str = this.readStringUTF16(len, littleEndian);
+                this.readUint32(littleEndian); // padding
+                return str;
+            }
+
+            getPlatformInfo(isLittleEndian) {
+                if (isLittleEndian) {
+                    return 'PS4 / PSVita / Switch';
+                } else {
+                    return 'PS3 / WiiU';
+                }
+            }
+
+            readStringUTF16(lengthInChars, littleEndian = false) {
+                const byteLength = lengthInChars * 2;
+                if (!this.canRead(byteLength)) {
+                    throw new Error(`UTF-16 文字列読み込み失敗`);
+                }
+
+                let decoded = '';
+                for (let i = 0; i < lengthInChars; i++) {
+                    const byte1 = this.view.getUint8(this.offset + i * 2);
+                    const byte2 = this.view.getUint8(this.offset + i * 2 + 1);
+                    const charCode = littleEndian ? (byte2 << 8) | byte1 : (byte1 << 8) | byte2;
+                    if (charCode === 0) break;
+                    decoded += String.fromCharCode(charCode);
+                }
+
+                this.offset += byteLength;
+                return decoded;
+            }
+        }
+
+        // =====================================================
+        // LOC ファイルパーサー
+        // =====================================================
+
+        class LOCParser {
+            constructor(arrayBuffer) {
+                this.buffer = arrayBuffer;
+                this.view = new DataView(arrayBuffer);
+                this.offset = 0;
+            }
+
+            readUint32(littleEndian = false) {
+                const value = this.view.getUint32(this.offset, littleEndian);
+                this.offset += 4;
+                return value;
+            }
+
+            readUint16(littleEndian = false) {
+                const value = this.view.getUint16(this.offset, littleEndian);
+                this.offset += 2;
+                return value;
+            }
+
+            readByte() {
+                return this.view.getUint8(this.offset++);
+            }
+
+            readBoolean() {
+                return this.readByte() !== 0;
+            }
+
+            readBytes(length) {
+                const bytes = new Uint8Array(this.buffer, this.offset, length);
+                this.offset += length;
+                return bytes;
+            }
+
+            readStringUTF8() {
+                const length = this.readUint16(false);
+                if (length === 0) return '';
+                
+                const bytes = new Uint8Array(this.buffer, this.offset, length);
+                this.offset += length;
+                
+                const decoder = new TextDecoder('utf-8');
+                return decoder.decode(bytes);
+            }
+
+            parse() {
+                try {
+                    const loc_type = this.readUint32(false);
+                    const language_count = this.readUint32(false);
+                    const lookUpKey = loc_type === 2;
+
+                    let hasUids = false;
+                    let keys = null;
+
+                    if (lookUpKey) {
+                        hasUids = this.readBoolean();
+                        this.offset--;
+                        keys = this.readKeys();
+                    }
+
+                    const languages = [];
+                    const bufferSizes = [];
+                    for (let i = 0; i < language_count; i++) {
+                        const language = this.readStringUTF8();
+                        const bufferSize = this.readUint32(false);
+                        languages.push(language);
+                        bufferSizes.push(bufferSize);
+                    }
+
+                    const locData = {};
+                    const versions = {};
+                    const hasUidsInEntry = {};
+                    for (let i = 0; i < language_count; i++) {
+                        const language = languages[i];
+                        const bufferSize = bufferSizes[i];
+                        const entryData = this.readBytes(bufferSize);
+                        
+                        const entryParser = new LOCParser(entryData.buffer.slice(entryData.byteOffset, entryData.byteOffset + entryData.byteLength));
+                        
+                        const version = entryParser.readUint32(false);
+                        versions[language] = version;
+                        
+                        if (version > 0) {
+                            const hasUidsValue = entryParser.readBoolean();
+                            hasUidsInEntry[language] = hasUidsValue;
+                        }
+
+                        const entryLanguage = entryParser.readStringUTF8();
+                        const count = entryParser.readUint32(false);
+
+                        locData[language] = {};
+                        for (let j = 0; j < count; j++) {
+                            const key = lookUpKey ? keys[j] : entryParser.readStringUTF8();
+                            const value = entryParser.readStringUTF8();
+                            locData[language][key] = value;
+                        }
+                    }
+
+                    return { languages, locData, keys, versions, hasUidsInEntry, hasUids, loc_type };
+
+                } catch (error) {
+                    console.error('LOC Parse Error:', error);
+                    return null;
+                }
+            }
+
+            readKeys() {
+                const useUniqueIds = this.readBoolean();
+                const keyCount = this.readUint32(false);
+                const keys = [];
+
+                for (let i = 0; i < keyCount; i++) {
+                    if (useUniqueIds) {
+                        const id = this.readUint32(false);
+                        keys.push(id.toString(16).toUpperCase().padStart(8, '0'));
+                    } else {
+                        keys.push(this.readStringUTF8());
+                    }
+                }
+
+                return keys;
+            }
+        }
+
+        // =====================================================
+        // UI コントローラ
+        // =====================================================
+
+        class PckViewer {
+            constructor() {
+                this.parser = null;
+                this.assets = [];
+                this.selectedAsset = null;
+                this.currentFilename = '';
+                this.currentLocData = null;
+                this.selectedLocKey = null;
+                this.currentTargetFolderNode = null;
+                this.currentTargetFolderPath = '';
+                this.currentPckFolder = null;
+                this.setupEventListeners();
+            }
+
+            // PCKアセットを正しくエンコード
+            encodePck(assets, pckType = 3, littleEndian = false) {
+                console.log('=== PCK Encode Start ===');
+                console.log('Assets count:', assets.length);
+                console.log('PCK Type:', pckType);
+                console.log('LittleEndian:', littleEndian);
+                
+                // プレースホルダーを除外
+                const assetsToEncode = assets.filter(asset => !asset._isPlaceholder);
+                console.log('Assets to encode (excluding placeholders):', assetsToEncode.length);
+                
+                const chunks = [];
+                
+                // 1. PCK Type (4バイト)
+                const typeBuffer = new ArrayBuffer(4);
+                new DataView(typeBuffer).setUint32(0, pckType, littleEndian);
+                chunks.push(new Uint8Array(typeBuffer));
+                console.log('PCK Type written:', pckType);
+                
+                // 2. プロパティルックアップテーブルを構築
+                const propertyMap = new Map();
+                let propertyIndex = 0;
+                
+                assetsToEncode.forEach(asset => {
+                    if (asset.properties) {
+                        asset.properties.forEach(prop => {
+                            if (prop.key && !propertyMap.has(prop.key)) {
+                                propertyMap.set(prop.key, propertyIndex++);
+                            }
+                        });
+                    }
+                });
+                
+                console.log('Property map size:', propertyMap.size);
+                
+                // LUT count
+                const lutCountBuffer = new ArrayBuffer(4);
+                new DataView(lutCountBuffer).setUint32(0, propertyMap.size, littleEndian);
+                chunks.push(new Uint8Array(lutCountBuffer));
+                
+                // LUT entries
+                propertyMap.forEach((index, key) => {
+                    const indexBuffer = new ArrayBuffer(4);
+                    new DataView(indexBuffer).setUint32(0, index, littleEndian);
+                    chunks.push(new Uint8Array(indexBuffer));
+                    chunks.push(this.encodeStringWithPadding(key, littleEndian));
+                });
+                
+                // 3. アセットエントリ
+                const assetCountBuffer = new ArrayBuffer(4);
+                new DataView(assetCountBuffer).setUint32(0, assetsToEncode.length, littleEndian);
+                chunks.push(new Uint8Array(assetCountBuffer));
+                console.log('Asset count written:', assetsToEncode.length);
+                
+                assetsToEncode.forEach((asset, idx) => {
+                    console.log(`Asset ${idx}: ${asset.filename}, type: ${asset.typeCode}, size: ${asset.dataSize}`);
+                    
+                    // assetSize
+                    const sizeBuffer = new ArrayBuffer(4);
+                    new DataView(sizeBuffer).setUint32(0, asset.dataSize, littleEndian);
+                    chunks.push(new Uint8Array(sizeBuffer));
+                    
+                    // assetType
+                    const typeBuffer = new ArrayBuffer(4);
+                    new DataView(typeBuffer).setUint32(0, asset.typeCode, littleEndian);
+                    chunks.push(new Uint8Array(typeBuffer));
+                    
+                    // filename
+                    chunks.push(this.encodeStringWithPadding(asset.filename, littleEndian));
+                });
+                
+                // 4. アセットコンテンツ
+                assetsToEncode.forEach((asset, idx) => {
+                    // propertyCount
+                    const propCount = asset.properties ? asset.properties.length : 0;
+                    const propCountBuffer = new ArrayBuffer(4);
+                    new DataView(propCountBuffer).setUint32(0, propCount, littleEndian);
+                    chunks.push(new Uint8Array(propCountBuffer));
+                    
+                    console.log(`Asset ${idx} properties count:`, propCount);
+                    
+                    // properties
+                    if (asset.properties) {
+                        asset.properties.forEach(prop => {
+                            const keyIndex = propertyMap.get(prop.key);
+                            const keyIndexBuffer = new ArrayBuffer(4);
+                            new DataView(keyIndexBuffer).setUint32(0, keyIndex, littleEndian);
+                            chunks.push(new Uint8Array(keyIndexBuffer));
+                            chunks.push(this.encodeStringWithPadding(prop.value, littleEndian));
+                        });
+                    }
+                    
+                    // data
+                    chunks.push(asset.data);
+                });
+                
+                // 全て結合
+                const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                const result = new Uint8Array(totalLength);
+                let offset = 0;
+                chunks.forEach(chunk => {
+                    result.set(chunk, offset);
+                    offset += chunk.length;
+                });
+                
+                console.log('Total encoded size:', totalLength);
+                console.log('=== PCK Encode End ===');
+                
+                return result.buffer;
+            }
+            
+            encodeStringWithPadding(str, littleEndian = false) {
+                const chunks = [];
+                
+                // length (文字数)
+                const lengthBuffer = new ArrayBuffer(4);
+                new DataView(lengthBuffer).setUint32(0, str.length, littleEndian);
+                chunks.push(new Uint8Array(lengthBuffer));
+                
+                // UTF-16 string
+                const strBuffer = new ArrayBuffer(str.length * 2);
+                const strView = new DataView(strBuffer);
+                for (let i = 0; i < str.length; i++) {
+                    strView.setUint16(i * 2, str.charCodeAt(i), littleEndian);
+                }
+                chunks.push(new Uint8Array(strBuffer));
+                
+                // padding (常に0)
+                const paddingBuffer = new ArrayBuffer(4);
+                new DataView(paddingBuffer).setUint32(0, 0, littleEndian);
+                chunks.push(new Uint8Array(paddingBuffer));
+                
+                const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                const result = new Uint8Array(totalLength);
+                let offset = 0;
+                chunks.forEach(chunk => {
+                    result.set(chunk, offset);
+                    offset += chunk.length;
+                });
+                
+                return result;
+            }
+
+            setupEventListeners() {
+                const fileInput = document.getElementById('fileInput');
+                if (fileInput) {
+                    fileInput.addEventListener('change', (e) => this.handleFileSelect(e.target.files[0]));
+                    console.log('File input listener registered');
+                } else {
+                    console.error('fileInput element not found in setupEventListeners');
+                }
+
+                // モバイルでサイドバー外をタップしたら閉じる
+                document.addEventListener('click', (e) => {
+                    const sidebar = document.querySelector('.sidebar');
+                    const toggle = document.querySelector('.mobile-menu-toggle');
+                    if (sidebar && sidebar.classList.contains('mobile-open')) {
+                        if (!sidebar.contains(e.target) && !toggle.contains(e.target)) {
+                            this.closeSidebar();
+                        }
+                    }
+                });
+            }
+
+            toggleSidebar() {
+                const sidebar = document.querySelector('.sidebar');
+                if (sidebar) {
+                    sidebar.classList.toggle('mobile-open');
+                }
+            }
+
+            closeSidebar() {
+                const sidebar = document.querySelector('.sidebar');
+                if (sidebar) {
+                    sidebar.classList.remove('mobile-open');
+                }
+            }
+
+            getPlatformInfo(isLittleEndian) {
+                if (isLittleEndian) {
+                    return 'PS4 / PSVita / Switch';
+                } else {
+                    return 'PS3 / WiiU';
+                }
+            }
+
+            showNewPackageDialog() {
+                document.getElementById('newPackageName').value = '';
+                document.getElementById('newPackagePACKID').value = '0';
+                document.getElementById('newPackageEndianLittle').checked = true;
+                document.getElementById('newPackageDialogOverlay').style.display = 'flex';
+            }
+
+            closeNewPackageDialog() {
+                document.getElementById('newPackageDialogOverlay').style.display = 'none';
+            }
+
+            createNewPackage() {
+                const packageName = document.getElementById('newPackageName').value.trim();
+                if (!packageName) {
+                    alert('パック名を入力してください');
+                    return;
+                }
+
+                const packIdStr = document.getElementById('newPackagePACKID').value.trim();
+                if (!packIdStr) {
+                    alert('PACKIDを入力してください');
+                    return;
+                }
+
+                const packId = parseInt(packIdStr, 10);
+                const MAX_PACK_ID = 0xffffff; // 16777215
+                const MIN_PACK_ID = 0;
+
+                if (isNaN(packId)) {
+                    alert('PACKIDは整数である必要があります');
+                    return;
+                }
+
+                if (packId < MIN_PACK_ID || packId > MAX_PACK_ID) {
+                    alert(`PACKIDは${MIN_PACK_ID}～${MAX_PACK_ID}（0x${MAX_PACK_ID.toString(16).toUpperCase()}）の範囲内である必要があります`);
+                    return;
+                }
+
+                const isLittleEndian = document.getElementById('newPackageEndianLittle').checked;
+
+                // 新しいPCKParserを作成（空のバッファ）
+                const emptyBuffer = new ArrayBuffer(1024 * 1024);
+                this.parser = new PckParser(emptyBuffer);
+                this.parser.isLittleEndian = isLittleEndian;
+                this.parser.pckType = 8; // PCK Type 8 (一般的な形式)
+                this.parser.platformInfo = this.getPlatformInfo(isLittleEndian);
+                this.assets = [];
+
+                // ファイル名。0"のアセットを追加（PACKIDプロパティ付き）
+                const packIdAsset = {
+                    filename: '0',
+                    typeCode: 4,
+                    dataSize: 0,
+                    dataOffset: 0,
+                    properties: [
+                        { key: 'PACKID', value: packId.toString() }
+                    ],
+                    data: new Uint8Array(0)
+                };
+                this.assets.push(packIdAsset);
+
+                // LOCファイルを作成（すべてのサポート言語を追加）
+                const languages = [
+                    'cs-CS', 'cs-CZ', 'da-DA', 'da-DK', 'de-DE', 'el-EL', 'el-GR', 
+                    'en-EN', 'en-GB', 'es-ES', 'es-MX', 'fi-FI', 'fr-FR', 'it-IT', 
+                    'ja-JP', 'ko-KR', 'la-LAS', 'nb-NO', 'nl-NL', 'no-NO', 'pl-PL', 
+                    'pt-BR', 'pt-PT', 'ru-RU', 'sk-SK', 'sv-SE', 'sv-SV', 'tr-TR', 
+                    'zh-CHT', 'zh-CN', 'zh-HANS', 'zh-HANT'
+                ];
+                const locData = {};
+                languages.forEach(lang => {
+                    locData[lang] = {
+                        'IDS_DISPLAY_NAME': packageName
+                    };
+                });
+                const keys = ['IDS_DISPLAY_NAME'];
+
+                const locBuffer = this.buildLocBuffer({ languages, locData, keys });
+                const locAsset = {
+                    filename: 'localisation.loc',
+                    typeCode: 6,
+                    dataSize: locBuffer.byteLength,
+                    dataOffset: 0,
+                    properties: [],
+                    data: new Uint8Array(locBuffer)
+                };
+                this.assets.push(locAsset);
+
+                // UI更新
+                this.currentFilename = `${packageName}.pck`;
+                this.updateInfoBar();
+                this.displayAssets();
+                this.closeNewPackageDialog();
+
+                // メニューを有効化
+                document.getElementById('menuSave').style.opacity = '1';
+                document.getElementById('menuSave').style.pointerEvents = 'auto';
+                document.getElementById('menuClose').style.opacity = '1';
+                document.getElementById('menuClose').style.pointerEvents = 'auto';
+
+                alert(`新しいPCKパッケージを作成しました: ${packageName}`);
+            }
+
+            openFile() {
+                const fileInput = document.getElementById('fileInput');
+                if (!fileInput) {
+                    console.error('fileInput element not found');
+                    alert('エラー: ファイル入力要素が見つかりません');
+                    return;
+                }
+                console.log('Opening file dialog...');
+                fileInput.click();
+            }
+
+            saveFile() {
+                if (!this.parser || !this.assets.length) {
+                    alert('保存するファイルがありません');
+                    return;
+                }
+
+                // エンディアン選択ダイアログを表示
+                const endianLittle = document.getElementById('endianLittle');
+                const endianBig = document.getElementById('endianBig');
+                
+                // 現在の設定をデフォルトとして保持
+                if (this.parser.isLittleEndian) {
+                    endianLittle.checked = true;
+                } else {
+                    endianBig.checked = true;
+                }
+                
+                document.getElementById('saveDialogOverlay').style.display = 'flex';
+            }
+
+            closeSaveDialog() {
+                document.getElementById('saveDialogOverlay').style.display = 'none';
+            }
+
+            async confirmSave() {
+                try {
+                    const isLittleEndian = document.getElementById('endianLittle').checked;
+                    
+                    // デフォルトファイル名を生成
+                    const filename = this.currentFilename ? this.currentFilename.replace(/\.pck$/i, '') : 'output';
+                    const defaultFilename = filename.endsWith('.pck') ? filename : filename + '.pck';
+                    
+                    let finalFilename = defaultFilename;
+                    let shouldDownload = false;
+                    
+                    // showSaveFilePicker が使用可能な場合（Chrome/Edge/Safari）
+                    if (window.showSaveFilePicker) {
+                        try {
+                            const handle = await window.showSaveFilePicker({
+                                suggestedName: defaultFilename,
+                                types: [{
+                                    description: 'PCK Files',
+                                    accept: { 'application/octet-stream': ['.pck'] }
+                                }]
+                            });
+                            
+                            const writable = await handle.createWritable();
+                            const buffer = this.buildPckBuffer(isLittleEndian);
+                            await writable.write(buffer);
+                            await writable.close();
+                            
+                            this.closeSaveDialog();
+                            alert(`ファイルを保存しました: ${handle.name}`);
+                            return;
+                        } catch (err) {
+                            if (err.name !== 'AbortError') {
+                                alert(`ファイルの保存に失敗しました: ${err.message}`);
+                            }
+                            return;
+                        }
+                    } else {
+                        // Firefox: プロンプトでファイル名を入力させる
+                        const userInput = prompt('ファイル名を入力してください:', defaultFilename);
+                        if (userInput === null) return; // キャンセルの場合
+                        
+                        finalFilename = userInput.trim() || defaultFilename;
+                        if (!finalFilename.endsWith('.pck')) {
+                            finalFilename += '.pck';
+                        }
+                        shouldDownload = true;
+                    }
+                    
+                    // ダウンロード方式でファイルを保存
+                    if (shouldDownload) {
+                        const buffer = this.buildPckBuffer(isLittleEndian);
+                        const blob = new Blob([buffer], { type: 'application/octet-stream' });
+                        const url = URL.createObjectURL(blob);
+                        
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = finalFilename;
+                        link.style.display = 'none';
+                        document.body.appendChild(link);
+                        
+                        // クリックイベントを発火（dispatchEventはFirefoxでより確実）
+                        link.dispatchEvent(new MouseEvent('click', { 
+                            bubbles: true,
+                            cancelable: true,
+                            view: window
+                        }));
+                        
+                        // クリーンアップ
+                        setTimeout(() => {
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                            this.closeSaveDialog();
+                        }, 100);
+                    }
+                } catch (error) {
+                    alert(`保存に失敗しました: ${error.message}`);
+                }
+            }
+
+            buildPckBuffer(isLittleEndian = null) {
+                const little = isLittleEndian !== null ? isLittleEndian : this.parser.isLittleEndian;
+                const buffer = new ArrayBuffer(1024 * 1024 * 10);
+                const view = new DataView(buffer);
+                const writer = {
+                    offset: 0,
+                    writeUint32: function(value) {
+                        view.setUint32(this.offset, value, little);
+                        this.offset += 4;
+                    },
+                    writeString: function(str) {
+                        const encoder = new TextEncoder();
+                        const bytes = encoder.encode(str);
+                        for (let i = 0; i < bytes.length; i++) {
+                            view.setUint8(this.offset++, bytes[i]);
+                        }
+                    },
+                    writeStringUTF16: function(str) {
+                        const arr = [];
+                        for (let i = 0; i < str.length; i++) {
+                            const code = str.charCodeAt(i);
+                            if (little) {
+                                arr.push(code & 0xFF);
+                                arr.push((code >> 8) & 0xFF);
+                            } else {
+                                arr.push((code >> 8) & 0xFF);
+                                arr.push(code & 0xFF);
+                            }
+                        }
+                        for (let i = 0; i < arr.length; i++) {
+                            view.setUint8(this.offset++, arr[i]);
+                        }
+                    },
+                    writeStringWithPadding: function(str) {
+                        const len = str.length;
+                        this.writeUint32(len);
+                        this.writeStringUTF16(str);
+                        this.writeUint32(0); // padding
+                    },
+                    writeBytes: function(bytes) {
+                        for (let i = 0; i < bytes.length; i++) {
+                            view.setUint8(this.offset++, bytes[i]);
+                        }
+                    }
+                };
+
+                // pckType
+                writer.writeUint32(this.parser.pckType);
+
+                // プレースホルダーを除外したアセットリスト
+                const assetsToSave = this.assets.filter(asset => !asset._isPlaceholder);
+
+                // Property Lookup Table
+                const props = new Set();
+                assetsToSave.forEach(asset => {
+                    asset.properties?.forEach(p => props.add(p.key));
+                });
+                const propArray = Array.from(props);
+
+                writer.writeUint32(propArray.length);
+                propArray.forEach((prop, idx) => {
+                    writer.writeUint32(idx); // index
+                    writer.writeStringWithPadding(prop);
+                });
+
+                // Asset Entries
+                writer.writeUint32(assetsToSave.length);
+                assetsToSave.forEach(asset => {
+                    writer.writeUint32(asset.dataSize);
+                    writer.writeUint32(asset.typeCode);
+                    writer.writeStringWithPadding(asset.filename);
+                });
+
+                // Asset Contents
+                assetsToSave.forEach(asset => {
+                    const propList = asset.properties || [];
+                    writer.writeUint32(propList.length);
+                    propList.forEach(prop => {
+                        const keyIdx = propArray.indexOf(prop.key);
+                        writer.writeUint32(keyIdx);
+                        writer.writeStringWithPadding(String(prop.value));
+                    });
+                    
+                    if (asset.data) {
+                        writer.writeBytes(new Uint8Array(asset.data));
+                    }
+                });
+
+                // バッファをトリミング
+                return buffer.slice(0, writer.offset);
+            }
+
+            closeFile() {
+                if (!this.parser) return;
+                
+                if (confirm('ファイルを閉じますか？')) {
+                    this.parser = null;
+                    this.assets = [];
+                    this.selectedAsset = null;
+                    this.currentFilename = '';
+                    
+                    document.getElementById('infoBar').classList.remove('active');
+                    document.getElementById('menuSave').style.opacity = '0.5';
+                    document.getElementById('menuSave').style.pointerEvents = 'none';
+                    document.getElementById('menuClose').style.opacity = '0.5';
+                    document.getElementById('menuClose').style.pointerEvents = 'none';
+                    
+                    document.getElementById('assetList').innerHTML = `
+                        <div class="welcome-screen">
+                            <div class="welcome-icon">📦</div>
+                            <div class="welcome-text">PCK ファイルを開く</div>
+                            <div class="welcome-hint">「ファイルを開く」をクリック</div>
+                        </div>
+                    `;
+                    
+                    document.getElementById('previewContent').innerHTML = `
+                        <div class="empty-message">
+                            <div class="empty-icon">👈</div>
+                            左側からアセットを選択してください
+                        </div>
+                    `;
+                    
+                    document.getElementById('detailsContent').innerHTML = `
+                        <div class="empty-message">
+                            <div class="empty-icon">ℹ️</div>
+                            アセット情報がここに表示されます
+                        </div>
+                    `;
+                }
+            }
+
+            handleFileSelect(file) {
+                if (!file) return;
+
+                if (!file.name.toLowerCase().endsWith('.pck')) {
+                    alert('.pck ファイルを選択してください');
+                    return;
+                }
+
+                this.currentFilename = file.name;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.parsePckFile(e.target.result);
+                };
+                reader.onerror = () => {
+                    alert('ファイル読み込みエラー');
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            parsePckFile(arrayBuffer) {
+                this.parser = new PckParser(arrayBuffer);
+                this.assets = this.parser.parse();
+
+                this.updateInfoBar();
+                this.displayAssets();
+                
+                // メニュー有効化
+                document.getElementById('menuSave').style.opacity = '1';
+                document.getElementById('menuSave').style.pointerEvents = 'auto';
+                document.getElementById('menuClose').style.opacity = '1';
+                document.getElementById('menuClose').style.pointerEvents = 'auto';
+            }
+
+            updateInfoBar() {
+                const infoBar = document.getElementById('infoBar');
+                infoBar.classList.add('active');
+                
+                document.getElementById('infoFilename').textContent = this.currentFilename;
+                document.getElementById('infoEndian').textContent = this.parser.isLittleEndian ? 'Little Endian' : 'Big Endian';
+                document.getElementById('infoPlatform').textContent = this.parser.platformInfo;
+                document.getElementById('infoAssetCount').textContent = this.assets.length;
+                
+                const totalSize = this.assets.reduce((sum, a) => sum + a.dataSize, 0);
+                document.getElementById('infoTotalSize').textContent = this.formatSize(totalSize);
+            }
+
+            displayAssets() {
+                const list = document.getElementById('assetList');
+                list.innerHTML = '';
+                
+                // プレースホルダーを除外したアセット数を表示
+                const visibleAssetCount = this.assets.filter(asset => !asset._isPlaceholder).length;
+                document.getElementById('assetCountLabel').textContent = `${visibleAssetCount} アセット`;
+
+                // ディレクトリ構造を構築
+                const tree = this.buildDirectoryTree();
+                this._currentTree = tree;  // 後で使用するために保存
+                this.renderTree(list, tree, null, '', null);  // 最後の引数をnullで初期化
+                
+                // 古いイベントリスナーを削除
+                if (this._rootContextMenuHandler) {
+                    list.removeEventListener('contextmenu', this._rootContextMenuHandler);
+                }
+                
+                // ルートレベル（空白エリア）の右クリックメニュー
+                this._rootContextMenuHandler = (e) => {
+                    // 子要素でない場合のみ（空白エリアをクリックした場合）
+                    if (e.target === list) {
+                        e.preventDefault();
+                        this.showContextMenu(e.clientX, e.clientY, {
+                            type: 'root',
+                            node: { _children: this._currentTree },  // 保存されたツリーを使用
+                            folderPath: '',
+                            currentPckFolder: null
+                        });
+                    }
+                };
+                list.addEventListener('contextmenu', this._rootContextMenuHandler);
+
+                // フォルダのトグル機能をセットアップ
+                document.querySelectorAll('.asset-folder-toggle').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const folder = btn.closest('.asset-folder');
+                        const content = folder.querySelector('.asset-folder-content');
+                        folder.classList.toggle('expanded');
+                        content.style.display = folder.classList.contains('expanded') ? 'block' : 'none';
+                    });
+                });
+            }
+
+            buildDirectoryTree() {
+                const tree = {};
+                
+                // 重複ファイル名をカウント（プレースホルダーも含めてカウント）
+                const filenameCounts = {};
+                this.assets.forEach(asset => {
+                    filenameCounts[asset.filename] = (filenameCounts[asset.filename] || 0) + 1;
+                });
+                
+                // 各ファイル名の出現回数を追跡
+                const filenameIndexes = {};
+
+                // ツリー構造を構築（プレースホルダーも含む）
+                this.assets.forEach((asset, index) => {
+                    const duplicateNum = filenameCounts[asset.filename] > 1 
+                        ? ` [#${++filenameIndexes[asset.filename] || 1}]`
+                        : '';
+                    
+                    if (asset.filename.includes('/')) {
+                        const parts = asset.filename.split('/');
+                        let current = tree;
+                        
+                        // フォルダパスを遡走
+                        for (let i = 0; i < parts.length - 1; i++) {
+                            const folder = parts[i];
+                            if (!current[folder]) {
+                                current[folder] = { _type: 'folder', _children: {} };
+                            }
+                            current = current[folder]._children;
+                        }
+                        
+                        // ファイルを追加（プレースホルダーは非表示扱い）
+                        const filename = parts[parts.length - 1];
+                        if (!asset._isPlaceholder) {
+                            current[filename + duplicateNum] = {
+                                _type: 'file',
+                                _asset: asset,
+                                _index: index
+                            };
+                        }
+                    } else {
+                        // ルートレベルのファイル（プレースホルダーは非表示扱い）
+                        if (!asset._isPlaceholder) {
+                            tree[asset.filename + duplicateNum] = {
+                                _type: 'file',
+                                _asset: asset,
+                                _index: index
+                            };
+                        }
+                    }
+                    
+                    // PCKファイルかチェックして子アセットを追加
+                    if (this.isPckFile(asset)) {
+                        const childAssets = this.parsePckAsset(asset);
+                        if (childAssets && childAssets.length > 0) {
+                            // PCKの場合は、ファイル名をフォルダとして扱う
+                            const folderKey = asset.filename + duplicateNum;
+                            let current = tree;
+                            
+                            if (asset.filename.includes('/')) {
+                                const parts = asset.filename.split('/');
+                                for (let i = 0; i < parts.length - 1; i++) {
+                                    const folder = parts[i];
+                                    if (!current[folder]) {
+                                        current[folder] = { _type: 'folder', _children: {} };
+                                    }
+                                    current = current[folder]._children;
+                                }
+                                const filename = parts[parts.length - 1];
+                                if (!current[filename + duplicateNum]) {
+                                    current[filename + duplicateNum] = { _type: 'pck-folder', _children: {}, _asset: asset };
+                                } else {
+                                    // 既存のファイルノードを PCK フォルダに変換
+                                    current[filename + duplicateNum]._type = 'pck-folder';
+                                    current[filename + duplicateNum]._children = {};
+                                    current[filename + duplicateNum]._asset = asset;
+                                }
+                                current = current[filename + duplicateNum]._children;
+                            } else {
+                                if (!tree[folderKey]) {
+                                    tree[folderKey] = { _type: 'pck-folder', _children: {}, _asset: asset };
+                                } else if (tree[folderKey]._type === 'file') {
+                                    tree[folderKey]._type = 'pck-folder';
+                                    tree[folderKey]._children = {};
+                                }
+                                current = tree[folderKey]._children;
+                            }
+                            
+                            // 子アセットをツリーに追加（親PCK情報も渡す）
+                            this.addChildAssetsToTree(current, childAssets, asset.filename, '', { asset: asset, index: index });
+                        }
+                    }
+                });
+
+                return tree;
+            }
+
+            addChildAssetsToTree(current, childAssets, parentPath, parentPathForFiles = '', parentPckInfo = null) {
+                const filenameCounts = {};
+                childAssets.forEach(asset => {
+                    filenameCounts[asset.filename] = (filenameCounts[asset.filename] || 0) + 1;
+                });
+                
+                const filenameIndexes = {};
+                
+                // 最初の呼び出しの場合、ファイル親パスをセット
+                if (!parentPathForFiles) {
+                    parentPathForFiles = parentPath;
+                }
+                
+                childAssets.forEach((asset, index) => {
+                    const duplicateNum = filenameCounts[asset.filename] > 1 
+                        ? ` [#${++filenameIndexes[asset.filename] || 1}]`
+                        : '';
+                    
+                    if (asset.filename.includes('/')) {
+                        const parts = asset.filename.split('/');
+                        let node = current;
+                        let accumulatedPath = parentPathForFiles;
+                        
+                        for (let i = 0; i < parts.length - 1; i++) {
+                            const folder = parts[i];
+                            accumulatedPath = accumulatedPath + '/' + folder;
+                            if (!node[folder]) {
+                                // フォルダ作成時に完全なパスと親PCK情報を保持
+                                node[folder] = { 
+                                    _type: 'folder', 
+                                    _children: {},
+                                    _fullPath: accumulatedPath,
+                                    _parentPckInfo: parentPckInfo
+                                };
+                            } else if (parentPckInfo && !node[folder]._parentPckInfo) {
+                                // 既存のフォルダにも親PCK情報を設定
+                                node[folder]._parentPckInfo = parentPckInfo;
+                            }
+                            node = node[folder]._children;
+                        }
+                        
+                        const filename = parts[parts.length - 1];
+                        // プレースホルダーでない場合のみファイルノードを追加
+                        if (!asset._isPlaceholder) {
+                            node[filename + duplicateNum] = {
+                                _type: 'file',
+                                _asset: asset,
+                                _parentPath: parentPathForFiles,
+                                _parentPckInfo: parentPckInfo,
+                                _childIndex: index
+                            };
+                        }
+                    } else {
+                        // プレースホルダーでない場合のみファイルノードを追加
+                        if (!asset._isPlaceholder) {
+                            current[asset.filename + duplicateNum] = {
+                                _type: 'file',
+                                _asset: asset,
+                                _parentPath: parentPathForFiles,
+                                _parentPckInfo: parentPckInfo,
+                                _childIndex: index
+                            };
+                        }
+                    }
+                    
+                    // 再帰的にPCKファイルをチェック
+                    if (this.isPckFile(asset)) {
+                        const grandchildAssets = this.parsePckAsset(asset);
+                        if (grandchildAssets && grandchildAssets.length > 0) {
+                            const nodeKey = asset.filename.includes('/') 
+                                ? asset.filename.split('/').pop() + duplicateNum
+                                : asset.filename + duplicateNum;
+                            
+                            let targetNode = current;
+                            if (asset.filename.includes('/')) {
+                                const parts = asset.filename.split('/');
+                                for (let i = 0; i < parts.length - 1; i++) {
+                                    targetNode = targetNode[parts[i]]._children;
+                                }
+                            }
+                            
+                            if (targetNode[nodeKey]._type === 'file') {
+                                targetNode[nodeKey]._type = 'pck-folder';
+                                targetNode[nodeKey]._children = {};
+                            }
+                            if (!targetNode[nodeKey]._children) {
+                                targetNode[nodeKey]._children = {};
+                            }
+                            
+                            // 孫アセットには、このアセット自体をparentPckInfoとして渡す
+                            const nestedPckInfo = { asset: asset, index: null };
+                            const nextParentPath = parentPath + '/' + asset.filename;
+                            const nextPathForFiles = parentPathForFiles + '/' + asset.filename;
+                            this.addChildAssetsToTree(targetNode[nodeKey]._children, grandchildAssets, nextParentPath, nextPathForFiles, nestedPckInfo);
+                        }
+                    }
+                });
+            }
+
+            isPckFile(asset) {
+                // typeCode が 5, 8, 11 の場合は PCK ファイル
+                return asset.typeCode === 5 || asset.typeCode === 8 || asset.typeCode === 11;
+            }
+
+            parsePckAsset(asset) {
+                try {
+                    let assetData;
+                    
+                    // 更新されたアセットの場合、asset.dataを使用
+                    if (asset.data && asset.data.byteLength > 0) {
+                        assetData = asset.data;
+                    } else {
+                        // 元のバッファから読み込み
+                        assetData = new Uint8Array(this.parser.buffer, asset.dataOffset, asset.dataSize);
+                    }
+                    
+                    // 新しい ArrayBuffer を作成（独立した buffer にする）
+                    const newBuffer = new ArrayBuffer(assetData.byteLength);
+                    new Uint8Array(newBuffer).set(assetData);
+                    
+                    // PCK として解析
+                    const childParser = new PckParser(newBuffer);
+                    const childAssets = childParser.parse();
+                    
+                    return childAssets;
+                } catch (e) {
+                    console.warn(`Failed to parse PCK asset: ${asset.filename}`, e);
+                    return null;
+                }
+            }
+
+            renderTree(parentElement, tree, parentNode, currentPath, currentPckFolder = null) {
+                Object.keys(tree).sort().forEach(key => {
+                    const node = tree[key];
+                    // PCK内のフォルダで _fullPath がある場合はそれを使用、そうでない場合は currentPath を累積
+                    let nodePath;
+                    let nextPckFolder = currentPckFolder;
+                    
+                    if (node._type === 'pck-folder') {
+                        // このノードがPCK-folder の場合、次のレベルではこれが基準になる
+                        nextPckFolder = key;
+                    }
+                    
+                    if (node._fullPath !== undefined) {
+                        // PCK内のフォルダで完全なパスが記録されている（フォルダ名を含む）
+                        nodePath = node._fullPath + '/';
+                    } else if (node._parentPath !== undefined) {
+                        // PCK内のフォルダだが _fullPath がない場合（PCK直下）
+                        nodePath = node._parentPath + '/' + key + '/';
+                    } else {
+                        // 通常のフォルダ
+                        nodePath = currentPath ? currentPath + key + '/' : key + '/';
+                    }
+                    
+                    if (node._type === 'folder' || node._type === 'pck-folder') {
+                        const folderDiv = document.createElement('div');
+                        folderDiv.className = 'asset-folder expanded';
+                        
+                        const toggleBtn = document.createElement('button');
+                        toggleBtn.className = 'asset-folder-toggle';
+                        const icon = node._type === 'pck-folder' ? '📦' : '📁';
+                        toggleBtn.innerHTML = '▼ ' + icon + ' ' + this.escapeHtml(key);
+                        toggleBtn.title = key;
+                        
+                        // フォルダへの右クリックメニュー
+                        // PCK-folder には右クリックメニューを表示しない
+                        if (node._type !== 'pck-folder') {
+                            folderDiv.addEventListener('contextmenu', (e) => {
+                                e.preventDefault();
+                                let contextFolderPath = nodePath;
+                                if (currentPckFolder !== null) {
+                                    const pckRelativePath = nodePath.substring((currentPckFolder + '/').length);
+                                    contextFolderPath = pckRelativePath;
+                                }
+                                
+                                this.showContextMenu(e.clientX, e.clientY, {
+                                    type: 'folder',
+                                    name: key,
+                                    node: node,
+                                    parentNode: parentNode,
+                                    folderPath: contextFolderPath,
+                                    currentPckFolder: currentPckFolder,
+                                    parentPckInfo: node._parentPckInfo,
+                                    parent: parentElement
+                                });
+                            });
+                        }
+                        
+                        const contentDiv = document.createElement('div');
+                        contentDiv.className = 'asset-folder-content';
+                        contentDiv.style.display = 'block';
+                        
+                        folderDiv.appendChild(toggleBtn);
+                        folderDiv.appendChild(contentDiv);
+                        parentElement.appendChild(folderDiv);
+                        
+                        this.renderTree(contentDiv, node._children, node, nodePath, nextPckFolder);
+                    } else {
+                        // ファイル
+                        const asset = node._asset;
+                        const index = node._index;
+                        
+                        const fileDiv = document.createElement('div');
+                        fileDiv.className = 'asset-item';
+                        
+                        // クラッシュスキン・マントのチェック
+                        const MAX_SIZE = 0x7FFF;
+                        const isSkinOrCape = asset.typeCode === 0 || asset.typeCode === 1;
+                        if (isSkinOrCape && asset.dataSize > MAX_SIZE) {
+                            fileDiv.className += ' crash-warning';
+                        }
+                        
+                        const icon = this.getAssetTypeIcon(asset);
+                        const displayName = key;
+                        
+                        let indexDisplay = '';
+                        if (index !== undefined && index !== null) {
+                            indexDisplay = `[${index}] `;
+                        }
+                        
+                        fileDiv.innerHTML = `
+                            <div class="asset-filename">
+                                <span class="asset-type-icon">${icon}</span>
+                                <span class="asset-file">${this.escapeHtml(displayName)}</span>
+                            </div>
+                            <div class="asset-info">
+                                ${indexDisplay}Type ${asset.typeCode} • ${this.formatSize(asset.dataSize)}
+                            </div>
+                            ${index !== undefined && index !== null ? `<button class="asset-delete-btn" onclick="event.stopPropagation(); viewer.deleteAsset(${index})" title="このアセットを削除">✕</button>` : ''}
+                        `;
+                        
+                        // ファイルへの右クリックメニュー
+                        fileDiv.addEventListener('contextmenu', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation(); // 親要素への伝播を止める
+                            // PCK内のファイルの場合、PCK相対パスを計算
+                            let contextFolderPath = currentPath;
+                            if (currentPckFolder !== null) {
+                                // PCK内のファイルの場合
+                                const pckRelativePath = currentPath.substring((currentPckFolder + '/').length);
+                                contextFolderPath = pckRelativePath;
+                            }
+                            
+                            this.showContextMenu(e.clientX, e.clientY, {
+                                type: 'file',
+                                name: key,
+                                asset: asset,
+                                index: index,
+                                parentNode: parentNode,
+                                folderPath: contextFolderPath,
+                                currentPckFolder: currentPckFolder,
+                                parentPckInfo: node._parentPckInfo,
+                                childIndex: node._childIndex
+                            });
+                        });
+                        
+                        fileDiv.addEventListener('click', () => this.selectAsset(asset, fileDiv, index));
+                        parentElement.appendChild(fileDiv);
+                    }
+                });
+            }
+
+            getAssetTypeIcon(asset) {
+                // typeCodeで判定
+                switch (asset.typeCode) {
+                    case 0:
+                        return '👤'; // スキン
+                    case 1:
+                        return '🧥'; // マント
+                    case 4:
+                        return '📦'; // PACKID
+                    case 6:
+                        return '🌐'; // LOC（言語ファイル）
+                    default:
+                        // その他はファイル名で判定
+                        const filename = asset.filename.toLowerCase();
+                        if (filename.endsWith('.json')) {
+                            return '📋';
+                        }
+                        if (filename.endsWith('.png')) {
+                            return '🖼️';
+                        }
+                        return '📄';
+                }
+            }
+
+            selectAsset(asset, element, index) {
+                this.selectedAsset = asset;
+                this.selectedAssetIndex = index;
+
+                // モバイルでサイドバーを閉じる
+                if (window.innerWidth <= 768) {
+                    this.closeSidebar();
+                }
+
+                document.querySelectorAll('.asset-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+                element.classList.add('selected');
+
+                this.displayPreview(asset);
+                this.displayDetails(asset);
+            }
+
+            displayPreview(asset) {
+                const header = document.getElementById('previewHeader');
+                const content = document.getElementById('previewContent');
+
+                let indexText = '';
+                if (this.selectedAssetIndex !== undefined) {
+                    indexText = `[${this.selectedAssetIndex}] `;
+                } else {
+                    const foundIndex = this.assets.indexOf(asset);
+                    if (foundIndex !== -1) {
+                        indexText = `[${foundIndex}] `;
+                    }
+                }
+                header.textContent = `プレビュー - ${indexText}${asset.filename}`;
+
+                if (asset.dataSize === 0) {
+                    content.innerHTML = '<div class="empty-message"><div class="empty-icon">📭</div>データなし</div>';
+                    return;
+                }
+
+                // .loc ファイルの特別処理
+                if (asset.filename.toLowerCase().endsWith('.loc')) {
+                    this.displayLocPreview(asset, content);
+                    return;
+                }
+
+                // 画像ファイルのプレビュー
+                if (asset.filename.toLowerCase().match(/\.(png|jpg|jpeg|gif|bmp)$/)) {
+                    this.displayImagePreview(asset, content);
+                    return;
+                }
+
+                // HEX プレビュー
+                const data = asset.data || new Uint8Array(this.parser.buffer, asset.dataOffset, Math.min(512, asset.dataSize));
+                let hex = '';
+                for (let i = 0; i < Math.min(512, data.length); i += 16) {
+                    const chunk = Array.from(data.slice(i, i + 16))
+                        .map(b => b.toString(16).padStart(2, '0'))
+                        .join(' ');
+                    const ascii = Array.from(data.slice(i, i + 16))
+                        .map(b => b >= 32 && b < 127 ? String.fromCharCode(b) : '.')
+                        .join('');
+                    hex += `${(asset.dataOffset + i).toString(16).padStart(8, '0')}  ${chunk.padEnd(48)}  ${ascii}\n`;
+                }
+
+                content.innerHTML = `<div class="preview-hex">${hex}</div>`;
+            }
+
+            displayLocPreview(asset, container) {
+                try {
+                    const locData = asset.data || new Uint8Array(this.parser.buffer, asset.dataOffset, asset.dataSize);
+                    const locParser = new LOCParser(locData.buffer.slice(locData.byteOffset, locData.byteOffset + locData.byteLength));
+                    const result = locParser.parse();
+
+                    if (!result) {
+                        container.innerHTML = '<div class="empty-message"><div class="empty-icon">❌</div>LOCファイルの解析に失敗しました</div>';
+                        return;
+                    }
+
+                    // LOCデータを保存
+                    this.currentLocData = result;
+                    this.selectedLocKey = null;
+                    const { languages, locData: entries } = result;
+                    
+                    console.log('=== LOC Display ===');
+                    console.log('言語数:', languages.length);
+                    console.log('言語リスト:', languages);
+                    console.log('locDataの言語:', Object.keys(entries));
+
+                    const allKeys = new Set();
+                    Object.values(entries).forEach(langEntries => {
+                        Object.keys(langEntries).forEach(key => allKeys.add(key));
+                    });
+                    // アセット一覧の順序を保持（ソートしない）
+                    const keyList = Array.from(allKeys);
+
+                    let html = '<div class="loc-editor-container">';
+                    
+                    // 左側: キーリスト
+                    html += '<div class="loc-keys-panel">';
+                    keyList.forEach(key => {
+                        // data属性でキーを渡す
+                        html += `<div class="loc-key-item" data-loc-key="${this.escapeAttr(key)}" onclick="viewer.selectLocKeyFromElement(this)">
+                            ${this.escapeHtml(key)}
+                        </div>`;
+                    });
+                    html += '</div>';
+                    
+                    // 右側: 詳細パネル
+                    html += '<div class="loc-detail-panel">';
+                    html += '<div class="loc-no-selection">← 左側からキーを選択してください</div>';
+                    html += '</div>';
+                    
+                    html += '</div>';
+                    
+                    container.innerHTML = html;
+                } catch (error) {
+                    console.error('LOC Preview Error:', error);
+                    container.innerHTML = `<div class="empty-message"><div class="empty-icon">❌</div>LOC解析エラー: ${error.message}</div>`;
+                }
+            }
+
+            selectLocKeyFromElement(element) {
+                // data属性からキーを取得
+                const key = element.dataset.locKey;
+                this.selectLocKey(key);
+            }
+
+            selectLocKey(key) {
+                if (!this.currentLocData) return;
+                
+                this.selectedLocKey = key;
+                const { languages, locData: entries } = this.currentLocData;
+                
+                console.log('selectLocKey:', key);
+                console.log('利用可能な言語:', languages);
+                console.log('各言語のデータ:');
+                languages.forEach(lang => {
+                    console.log(`  ${lang}:`, entries[lang]?.[key]);
+                });
+                
+                // キーアイテムのハイライト
+                document.querySelectorAll('.loc-key-item').forEach(item => {
+                    item.classList.remove('selected');
+                    if (item.dataset.locKey === key) {
+                        item.classList.add('selected');
+                    }
+                });
+                
+                // 詳細パネルを更新
+                const detailPanel = document.querySelector('.loc-detail-panel');
+                let html = '';
+                
+                // 一括置換UI
+                html += '<div class="loc-bulk-replace">';
+                html += '<div class="loc-bulk-replace-title">✨ すべての言語に一括適用</div>';
+                html += '<div class="loc-bulk-replace-input">';
+                html += `<input type="text" id="locBulkReplaceInput" placeholder="すべての言語に適用するテキスト">`;
+                html += `<button class="loc-bulk-replace-btn" onclick="viewer.applyBulkReplace()">一括適用</button>`;
+                html += '</div>';
+                html += '</div>';
+                
+                // 各言語の値
+                html += '<div class="loc-values-container">';
+                languages.forEach(lang => {
+                    const value = entries[lang]?.[key] || '';
+                    html += '<div class="loc-value-edit-row">';
+                    html += `<div class="loc-lang-label-edit">${this.escapeHtml(lang)}</div>`;
+                    html += `<input type="text" class="loc-value-edit-input" 
+                                   value="${this.escapeAttr(value)}" 
+                                   data-key="${this.escapeAttr(key)}" 
+                                   data-lang="${this.escapeAttr(lang)}"
+                                   onchange="viewer.updateLocValue(this)">`;
+                    html += '</div>';
+                });
+                html += '</div>';
+                
+                detailPanel.innerHTML = html;
+            }
+
+            applyBulkReplace() {
+                if (!this.currentLocData || !this.selectedLocKey) return;
+                
+                const bulkValue = document.getElementById('locBulkReplaceInput').value;
+                const { languages } = this.currentLocData;
+                
+                // すべての言語に同じ値を設定
+                languages.forEach(lang => {
+                    if (!this.currentLocData.locData[lang]) {
+                        this.currentLocData.locData[lang] = {};
+                    }
+                    this.currentLocData.locData[lang][this.selectedLocKey] = bulkValue;
+                });
+                
+                // LOCバッファを再構築
+                this.rebuildLocBuffer();
+                
+                // UIを再描画
+                this.selectLocKey(this.selectedLocKey);
+                
+                alert(`「${this.selectedLocKey}」をすべての言語に適用しました`);
+            }
+
+            rebuildLocBuffer() {
+                if (!this.currentLocData || !this.selectedAsset) return;
+                
+                try {
+                    // keysを更新
+                    const allKeys = new Set(this.currentLocData.keys);
+                    Object.values(this.currentLocData.locData).forEach(langEntries => {
+                        Object.keys(langEntries).forEach(key => allKeys.add(key));
+                    });
+                    const updatedKeys = Array.from(allKeys);
+                    
+                    const newBuffer = this.buildLocBuffer({
+                        ...this.currentLocData,
+                        keys: updatedKeys
+                    });
+                    this.selectedAsset.data = new Uint8Array(newBuffer);
+                    this.selectedAsset.dataSize = newBuffer.byteLength;
+                    
+                    // 保存ボタンを有効化
+                    document.getElementById('menuSave').style.opacity = '1';
+                    document.getElementById('menuSave').style.pointerEvents = 'auto';
+                } catch (error) {
+                    console.error('LOC更新エラー:', error);
+                    alert(`LOCの更新に失敗しました: ${error.message}`);
+                }
+            }
+
+            displayImagePreview(asset, container) {
+                try {
+                    const imageData = asset.data || new Uint8Array(this.parser.buffer, asset.dataOffset, asset.dataSize);
+                    
+                    // Blob URL の代わりに Data URL を使用（URLの有効期限問題を避ける）
+                    const base64 = btoa(String.fromCharCode.apply(null, imageData));
+                    const dataUrl = 'data:image/png;base64,' + base64;
+
+                    // 画像を読み込んでサイズを確認
+                    const img = new Image();
+                    img.onload = () => {
+                        // 小さい画像は自動拡大（64x64のスキンなど）
+                        let displayWidth = img.width;
+                        let displayHeight = img.height;
+                        
+                        // 画像が300px未満の場合は拡大
+                        if (img.width < 300 || img.height < 300) {
+                            // 最低でも幅300pxになるように拡大
+                            const scale = Math.max(Math.ceil(300 / img.width), Math.ceil(300 / img.height));
+                            displayWidth = img.width * scale;
+                            displayHeight = img.height * scale;
+                        }
+                        
+                        container.innerHTML = `
+                            <div style="text-align: center; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                <img src="${dataUrl}" 
+                                     style="width: ${displayWidth}px; height: ${displayHeight}px; max-width: 100%; height: auto; image-rendering: pixelated; border: 1px solid #3e3e42; background: repeating-conic-gradient(#2a2a2a 0% 25%, #1e1e1e 0% 50%) 50% / 20px 20px;" />
+                                <div style="color: #858585; font-size: 11px;">
+                                    元サイズ: ${img.width} × ${img.height} px
+                                    ${displayWidth !== img.width ? ` → 拡大表示: ${displayWidth} × ${displayHeight} px` : ''}
+                                </div>
+                            </div>
+                        `;
+                    };
+                    
+                    img.onerror = () => {
+                        container.innerHTML = '<div class="empty-message"><div class="empty-icon">🖼️</div>画像の表示に失敗しました</div>';
+                    };
+                    
+                    img.src = dataUrl;
+                } catch (error) {
+                    container.innerHTML = '<div class="empty-message"><div class="empty-icon">🖼️</div>画像の表示に失敗しました</div>';
+                }
+            }
+
+            displayDetails(asset) {
+                const container = document.getElementById('detailsContent');
+
+                let html = '';
+                
+                // スキン・マントのサイズ警告チェック（0x7FFF = 32767バイト）
+                const MAX_SIZE = 0x7FFF;
+                const isSkinOrCape = asset.typeCode === 0 || asset.typeCode === 1;
+                const isOversized = isSkinOrCape && asset.dataSize > MAX_SIZE;
+                
+                if (isOversized) {
+                    const typeName = asset.typeCode === 0 ? 'スキン' : 'マント';
+                    html += `<div style="background: #5a1f1f; border: 2px solid #d32f2f; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
+                        <div style="color: #ff6b6b; font-weight: bold; margin-bottom: 8px;">⚠️ クラッシュ警告</div>
+                        <div style="color: #d4d4d4; font-size: 12px; line-height: 1.6;">
+                            この${typeName}のサイズは <strong>${asset.dataSize} バイト（0x${asset.dataSize.toString(16).toUpperCase()}）</strong>です。<br>
+                            0x7FFF（${MAX_SIZE}バイト）を超える${typeName}はゲーム内でクラッシュする可能性があります。
+                        </div>
+                    </div>`;
+                }
+                
+                if (asset.properties && asset.properties.length > 0) {
+                    html += '<div class="properties-list">';
+                    asset.properties.forEach((prop, index) => {
+                        html += `<div class="property-item">
+                            <input type="text" class="property-key-input" 
+                                   value="${this.escapeHtml(prop.key)}" 
+                                   data-index="${index}"
+                                   data-type="key"
+                                   onchange="viewer.updateProperty(this)">
+                            <input type="text" class="property-value-input" 
+                                   value="${this.escapeHtml(prop.value)}" 
+                                   data-index="${index}"
+                                   data-type="value"
+                                   onchange="viewer.updateProperty(this)">
+                            <button class="property-delete-btn" onclick="viewer.deleteProperty(${index})" title="このプロパティを削除">✕</button>
+                        </div>`;
+                    });
+                    html += '</div>';
+                    
+                    // プロパティ追加ボタン
+                    html += `<button class="btn-asset-action" onclick="viewer.addProperty()">➕ プロパティ追加</button>`;
+                    
+                    // アクションボタン
+                    html += '<div class="asset-action-buttons">';
+                    html += '</div>';
+                } else {
+                    html += `<div class="empty-message"><div class="empty-icon">📋</div>プロパティなし</div>`;
+                    html += `<button class="btn-asset-action" onclick="viewer.addProperty()">➕ プロパティ追加</button>`;
+                }
+
+                container.innerHTML = html;
+            }
+
+            formatSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            escapeAttr(text) {
+                // HTML属性値用のエスケープ（制御文字を数値文字参照に変換）
+                return this.escapeHtml(text)
+                    .replace(/\n/g, '&#10;')
+                    .replace(/\r/g, '&#13;')
+                    .replace(/\t/g, '&#9;');
+            }
+
+            showSkinSelector() {
+                const modal = document.getElementById('importModal');
+                document.getElementById('skinFileInput').value = '';
+                document.getElementById('skinNameInput').value = '';
+                document.getElementById('skinThemeInput').value = '';
+                document.getElementById('skinIdInput').value = '';
+                document.getElementById('skinModelInput').value = 'steve';
+                document.getElementById('capeFileInput').value = '';
+                document.getElementById('skinPreviewArea').style.display = 'none';
+                document.getElementById('capePreviewArea').style.display = 'none';
+                modal.classList.add('active');
+            }
+
+            showTypeSelector(type) {
+                // スキン/マントのアセットを抽出
+                const items = this.assets.filter(asset => {
+                    // FREE プロパティをチェック（FREE=1は選択不可）
+                    const hasFree = asset.properties && asset.properties.some(p => p.key === 'FREE' && p.value === '1');
+                    if (hasFree) return false;
+                    
+                    // スキンまたはマントのみを対象
+                    const name = asset.filename.toLowerCase();
+                    if (type === 'skin') {
+                        return name.endsWith('.png') && !name.includes('cape') && !name.includes('elytra');
+                    } else { // cape
+                        return (name.includes('cape') || name.includes('elytra')) && name.endsWith('.png');
+                    }
+                });
+
+                // モーダル内容を生成
+                let html = '';
+                if (items.length === 0) {
+                    html = '<div class="empty-message"><div class="empty-icon">📭</div>該当するアイテムがありません</div>';
+                } else {
+                    html = items.map((item, idx) => {
+                        const anim = item.properties?.find(p => p.key === 'ANIM')?.value || '-';
+                        let modelType = 'Unknown';
+                        if (anim) {
+                            if (anim === '0x00080000' || anim === '524288') modelType = 'Alex';
+                            else if (anim === '0x00040000' || anim === '262144') modelType = 'Steve';
+                        }
+                        
+                        // ディレクトリを含むファイルパスの処理
+                        let filenameHtml = '';
+                        if (item.filename.includes('/')) {
+                            const parts = item.filename.split('/');
+                            const filename = parts[parts.length - 1];
+                            const directory = parts.slice(0, -1).join('/');
+                            filenameHtml = `<span class="skin-item-dir">${this.escapeHtml(directory)}/</span><span class="skin-item-file">${this.escapeHtml(filename)}</span>`;
+                        } else {
+                            filenameHtml = `<span class="skin-item-file">${this.escapeHtml(item.filename)}</span>`;
+                        }
+                        
+                        return `
+                            <div class="skin-item" onclick="viewer.selectItem(${idx}, '${type}', '${this.escapeHtml(item.filename)}')">
+                                <div class="skin-item-name">${filenameHtml}</div>
+                                <div class="skin-item-info">Model: ${modelType} • Size: ${this.formatSize(item.dataSize)}</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                const modal = document.getElementById('skinModal');
+                const title = document.getElementById('skinModalTitle');
+                const content = document.getElementById('skinModalContent');
+                
+                title.textContent = type === 'skin' ? 'スキンを選択' : 'マントを選択';
+                content.innerHTML = html;
+                modal.classList.add('active');
+            }
+
+            selectItem(index, type, filename) {
+                const items = this.assets.filter(asset => {
+                    const hasFree = asset.properties && asset.properties.some(p => p.key === 'FREE' && p.value === '1');
+                    if (hasFree) return false;
+                    const name = asset.filename.toLowerCase();
+                    if (type === 'skin') {
+                        return name.endsWith('.png') && !name.includes('cape') && !name.includes('elytra');
+                    } else {
+                        return (name.includes('cape') || name.includes('elytra')) && name.endsWith('.png');
+                    }
+                });
+
+                const selected = items[index];
+                if (!selected) return;
+
+                // スキン選択後の処理
+                alert(`${type === 'skin' ? 'スキン' : 'マント'}を選択しました: ${filename}\\n(実装予定)`);
+                this.closeSkinModal();
+            }
+
+            closeSkinModal() {
+                const modal = document.getElementById('skinModal');
+                modal.classList.remove('active');
+            }
+
+            showContextMenu(x, y, data) {
+                const menu = document.getElementById('contextMenu');
+                menu.innerHTML = '';
+                menu.classList.remove('hidden');
+                
+                const items = [];
+                
+                if (data.type === 'file') {
+                    items.push({
+                        label: 'スキンを追加',
+                        action: () => this.addSkinToFolder(data.parentNode, data.folderPath, data.currentPckFolder)
+                    });
+                    
+                    // スキンまたはPNGファイルの場合、置き換えオプションを追加
+                    const isPngOrSkin = data.asset.typeCode === 0 || data.asset.filename.toLowerCase().endsWith('.png');
+                    if (isPngOrSkin) {
+                        items.push({
+                            label: '画像を置き換え',
+                            action: () => this.replaceAssetImage(data.asset, data.parentPckInfo, data.childIndex)
+                        });
+                    }
+                    
+                    items.push({ divider: true });
+                    items.push({
+                        label: '削除',
+                        action: () => this.deleteMenuItem(data.index, data.parentPckInfo, data.childIndex, data.asset)
+                    });
+                } else if (data.type === 'folder') {
+                    // フォルダへのメニュー
+                    items.push({
+                        label: 'スキンを追加',
+                        action: () => this.addSkinToFolder(data.node, data.folderPath, data.currentPckFolder)
+                    });
+                    items.push({
+                        label: 'フォルダを作成',
+                        action: () => this.createNewFolder(data)
+                    });
+                    items.push({ divider: true });
+                    items.push({
+                        label: 'フォルダを削除',
+                        action: () => this.deleteMenuItem(data)
+                    });
+                } else if (data.type === 'root') {
+                    // ルートレベルのメニュー
+                    items.push({
+                        label: 'スキンを追加',
+                        action: () => this.addSkinToFolder(data.node, data.folderPath, data.currentPckFolder)
+                    });
+                    items.push({
+                        label: 'フォルダを作成',
+                        action: () => this.createNewFolder(data)
+                    });
+                }
+                
+                items.forEach(item => {
+                    if (item.divider) {
+                        const divider = document.createElement('div');
+                        divider.className = 'context-menu-divider';
+                        menu.appendChild(divider);
+                    } else {
+                        const menuItem = document.createElement('button');
+                        menuItem.className = 'context-menu-item';
+                        menuItem.textContent = item.label;
+                        menuItem.onclick = (e) => {
+                            e.stopPropagation();
+                            this.hideContextMenu();
+                            item.action();
+                        };
+                        menu.appendChild(menuItem);
+                    }
+                });
+                
+                menu.style.left = x + 'px';
+                menu.style.top = y + 'px';
+                
+                // メニュー内のクリックは伝播させない
+                menu.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
+                
+                // メニュー以外をクリックするとメニューが消える
+                const handleClickOutside = (e) => {
+                    if (!menu.contains(e.target)) {
+                        this.hideContextMenu();
+                        document.removeEventListener('click', handleClickOutside);
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', handleClickOutside), 0);
+            }
+
+            hideContextMenu() {
+                const menu = document.getElementById('contextMenu');
+                menu.classList.add('hidden');
+            }
+
+            deleteMenuItem(data, parentPckInfo, childIndex, asset) {
+                // アセットが渡されている場合、または親PCK情報がある場合はファイル削除
+                if (asset || (parentPckInfo && childIndex !== undefined)) {
+                    // ネストされたPCK内のファイル削除
+                    const index = typeof data === 'number' ? data : undefined;
+                    this.deleteAsset(index, parentPckInfo, childIndex, asset);
+                } else if (typeof data === 'number') {
+                    // ルートレベルのファイル削除
+                    const index = data;
+                    this.deleteAsset(index, parentPckInfo, childIndex, asset);
+                } else {
+                    // フォルダ削除
+                    this.deleteFolder(data, parentPckInfo);
+                }
+            }
+
+            deleteFolder(data, parentPckInfo) {
+                // 親PCK情報を取得
+                const actualParentPckInfo = parentPckInfo || data.parentPckInfo || (data.node && data.node._parentPckInfo);
+                
+                const folderPath = data.folderPath;
+                // folderPathが既に/で終わっている場合はそのまま、そうでない場合は/を追加
+                const searchPath = folderPath.endsWith('/') ? folderPath : folderPath + '/';
+                
+                console.log('deleteFolder debug:', {
+                    folderPath: folderPath,
+                    searchPath: searchPath,
+                    currentPckFolder: data.currentPckFolder,
+                    hasActualParentPck: !!actualParentPckInfo,
+                    nodeHasParentPck: !!(data.node && data.node._parentPckInfo)
+                });
+                
+                // フォルダ内の全ファイルを収集
+                let filesToDelete = [];
+                
+                if (actualParentPckInfo && actualParentPckInfo.asset) {
+                    // ネストされたPCK内のフォルダ削除
+                    const childAssets = this.parsePckAsset(actualParentPckInfo.asset);
+                    if (!childAssets) return;
+                    
+                    console.log(`Nested PCK has ${childAssets.length} assets`);
+                    childAssets.forEach((childAsset, idx) => {
+                        const matches = childAsset.filename.startsWith(searchPath);
+                        console.log(`  [${idx}] ${childAsset.filename} - matches: ${matches}`);
+                        if (matches) {
+                            filesToDelete.push({
+                                asset: childAsset,
+                                index: idx,
+                                isNested: true
+                            });
+                        }
+                    });
+                } else {
+                    // ルートレベルのフォルダ削除
+                    this.assets.forEach((asset, idx) => {
+                        if (asset.filename.startsWith(searchPath)) {
+                            filesToDelete.push({
+                                asset: asset,
+                                index: idx,
+                                isNested: false
+                            });
+                        }
+                    });
+                }
+                
+                if (filesToDelete.length === 0) {
+                    alert('削除するファイルが見つかりません');
+                    return;
+                }
+                
+                // 確認ダイアログ
+                const fileCount = filesToDelete.length;
+                if (!confirm(`フォルダ "${folderPath}" とその中の ${fileCount} 個のファイルを削除してもいいですか？`)) {
+                    return;
+                }
+                
+                // スキンのDISPLAYNAMEID/THEMENAMEIDを収集してLOCから削除
+                const locKeysToRemove = [];
+                filesToDelete.forEach(item => {
+                    if (item.asset.typeCode === 0 && item.asset.properties) {
+                        const displayNameIdProp = item.asset.properties.find(p => p.key === 'DISPLAYNAMEID');
+                        const themeNameIdProp = item.asset.properties.find(p => p.key === 'THEMENAMEID');
+                        
+                        if (displayNameIdProp) {
+                            locKeysToRemove.push(displayNameIdProp.value);
+                        }
+                        if (themeNameIdProp) {
+                            locKeysToRemove.push(themeNameIdProp.value);
+                        }
+                    }
+                });
+                
+                // LOCから削除
+                locKeysToRemove.forEach(key => {
+                    if (actualParentPckInfo && actualParentPckInfo.asset) {
+                        // 親PCK内のLOCから削除
+                        this.removeFromLoc(key, actualParentPckInfo.asset);
+                        // 大元のLOCファイルからも削除
+                        this.removeFromLoc(key);
+                    } else {
+                        // ルートのLOCから削除
+                        this.removeFromLoc(key);
+                    }
+                });
+                
+                // ファイルを削除（インデックスの大きい順に削除して配列のずれを防ぐ）
+                filesToDelete.sort((a, b) => b.index - a.index);
+                
+                if (actualParentPckInfo && actualParentPckInfo.asset) {
+                    // ネストされたPCK内の削除
+                    const pckAsset = actualParentPckInfo.asset;
+                    const childAssets = this.parsePckAsset(pckAsset);
+                    
+                    filesToDelete.forEach(item => {
+                        childAssets.splice(item.index, 1);
+                    });
+                    
+                    // PCKを再エンコード
+                    const originalPckType = pckAsset.typeCode === 5 ? 3 : (pckAsset.typeCode === 8 ? 4 : 5);
+                    const originalLittleEndian = this.parser ? this.parser.littleEndian : false;
+                    
+                    console.log(`Reencoding PCK after folder deletion: type=${originalPckType}, littleEndian=${originalLittleEndian}, remaining assets=${childAssets.length}`);
+                    
+                    const updatedPckBuffer = this.encodePck(childAssets, originalPckType, originalLittleEndian);
+                    pckAsset.data = new Uint8Array(updatedPckBuffer);
+                    pckAsset.dataSize = updatedPckBuffer.byteLength;
+                    
+                    console.log(`Updated PCK size after folder deletion: ${pckAsset.dataSize} bytes`);
+                } else {
+                    // ルートレベルの削除
+                    filesToDelete.forEach(item => {
+                        this.assets.splice(item.index, 1);
+                    });
+                }
+                
+                // 保存ボタンを有効化
+                document.getElementById('menuSave').style.opacity = '1';
+                document.getElementById('menuSave').style.pointerEvents = 'auto';
+                
+                // UI更新
+                this.displayAssets();
+                
+                alert(`フォルダ "${folderPath}" と ${fileCount} 個のファイルを削除しました`);
+            }
+
+            createNewFolder(data) {
+                const folderName = prompt('新しいフォルダ名を入力してください:');
+                if (!folderName || folderName.trim() === '') return;
+                
+                const trimmedName = folderName.trim();
+                
+                // フォルダパスを計算
+                let newFolderPath;
+                if (data.folderPath && data.folderPath.length > 0) {
+                    newFolderPath = data.folderPath + trimmedName;
+                } else {
+                    newFolderPath = trimmedName;
+                }
+                
+                // ネストされたPCK内の場合、PCK名を含める
+                let actualPath = newFolderPath;
+                if (data.currentPckFolder) {
+                    actualPath = data.currentPckFolder + '/' + newFolderPath;
+                }
+                
+                // プレースホルダーファイルを作成（フォルダの存在を表現）
+                const placeholderFilename = actualPath + '/.folder_placeholder';
+                const placeholderAsset = {
+                    filename: placeholderFilename,
+                    typeCode: 99,  // 特殊なタイプコード
+                    dataSize: 0,
+                    dataOffset: 0,
+                    properties: [],
+                    data: new Uint8Array(0),
+                    _isPlaceholder: true  // プレースホルダーフラグ
+                };
+                
+                // ネストされたPCK内の場合
+                if (data.currentPckFolder) {
+                    const pckAsset = this.assets.find(asset => 
+                        (asset.typeCode === 5 || asset.typeCode === 8 || asset.typeCode === 11) &&
+                        asset.filename === data.currentPckFolder
+                    );
+                    
+                    if (pckAsset) {
+                        try {
+                            const childAssets = this.parsePckAsset(pckAsset);
+                            const pckRelativeFilename = placeholderFilename.substring(data.currentPckFolder.length + 1);
+                            const pckPlaceholderAsset = {
+                                filename: pckRelativeFilename,
+                                typeCode: 99,
+                                dataSize: 0,
+                                dataOffset: 0,
+                                properties: [],
+                                data: new Uint8Array(0),
+                                _isPlaceholder: true
+                            };
+                            childAssets.push(pckPlaceholderAsset);
+                            
+                            // PCKを再エンコード
+                            const originalPckType = pckAsset.typeCode === 5 ? 3 : (pckAsset.typeCode === 8 ? 4 : 5);
+                            const originalLittleEndian = this.parser ? this.parser.littleEndian : false;
+                            const updatedPckBuffer = this.encodePck(childAssets, originalPckType, originalLittleEndian);
+                            pckAsset.data = new Uint8Array(updatedPckBuffer);
+                            pckAsset.dataSize = updatedPckBuffer.byteLength;
+                        } catch (error) {
+                            console.error('ネストされたPCK内のフォルダ作成に失敗:', error);
+                            alert('フォルダの作成に失敗しました: ' + error.message);
+                            return;
+                        }
+                    }
+                } else {
+                    // ルートレベルに追加
+                    this.assets.push(placeholderAsset);
+                }
+                
+                // 保存ボタンを有効化
+                document.getElementById('menuSave').style.opacity = '1';
+                document.getElementById('menuSave').style.pointerEvents = 'auto';
+                
+                // ツリーを再表示
+                this.displayAssets();
+                alert(`フォルダ "${trimmedName}" を作成しました（内部的に仮ファイルを使用します）`);
+            }
+
+            addSkinToFolder(targetNode, folderPath, currentPckFolder = null) {
+                this.currentTargetFolderNode = targetNode;
+                this.currentTargetFolderPath = folderPath || '';
+                this.currentPckFolder = currentPckFolder;
+                this.showSkinSelector();
+            }
+
+            openSkinAddDialog() {
+                // ルートレベルにスキンを追加
+                this.currentTargetFolderNode = null;
+                this.currentTargetFolderPath = '';
+                this.currentPckFolder = null;  // PCK フォルダをリセット
+                this.showSkinSelector();
+            }
+
+            handleSkinFileSelect(file) {
+                if (!file) return;
+                
+                if (!file.name.toLowerCase().endsWith('.png')) {
+                    alert('PNG画像ファイルを選択してください');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.selectedSkinData = e.target.result;
+                    
+                    // Base64エンコード
+                    const base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(e.target.result)));
+                    const dataUrl = 'data:image/png;base64,' + base64;
+                    
+                    // プレビュー表示
+                    document.getElementById('skinPreview').src = dataUrl;
+                    document.getElementById('skinPreviewArea').style.display = 'block';
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            handleCapeFileSelect(file) {
+                if (!file) {
+                    this.selectedCapeData = null;
+                    this.selectedCapeName = null;
+                    document.getElementById('capePreviewArea').style.display = 'none';
+                    return;
+                }
+                
+                if (!file.name.toLowerCase().endsWith('.png')) {
+                    alert('PNG画像ファイルを選択してください');
+                    document.getElementById('capeFileInput').value = '';
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.selectedCapeData = e.target.result;
+                    this.selectedCapeName = file.name.replace(/\.png$/i, '');
+                    
+                    // Base64エンコード
+                    const base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(e.target.result)));
+                    const dataUrl = 'data:image/png;base64,' + base64;
+                    
+                    // プレビュー表示
+                    document.getElementById('capePreview').src = dataUrl;
+                    document.getElementById('capePreviewArea').style.display = 'block';
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            addSkinToPackage() {
+                if (!this.selectedSkinData) {
+                    alert('スキムファイルを選択してください');
+                    return;
+                }
+
+                // スキンサイズチェック（0x7FFF = 32767バイト）
+                const MAX_SIZE = 0x7FFF;
+                if (this.selectedSkinData.byteLength > MAX_SIZE) {
+                    if (!confirm(`⚠️ 警告: スキンのサイズが ${this.selectedSkinData.byteLength} バイト（0x${this.selectedSkinData.byteLength.toString(16).toUpperCase()}）です。\n\n0x7FFF（${MAX_SIZE}バイト）を超えるスキンはゲーム内でクラッシュする可能性があります。\n\nそれでも追加しますか？`)) {
+                        return;
+                    }
+                }
+
+                // マントサイズチェック
+                if (this.selectedCapeData && this.selectedCapeData.byteLength > MAX_SIZE) {
+                    if (!confirm(`⚠️ 警告: マントのサイズが ${this.selectedCapeData.byteLength} バイト（0x${this.selectedCapeData.byteLength.toString(16).toUpperCase()}）です。\n\n0x7FFF（${MAX_SIZE}バイト）を超えるマントはゲーム内でクラッシュする可能性があります。\n\nそれでも追加しますか？`)) {
+                        return;
+                    }
+                }
+
+                const skinName = document.getElementById('skinNameInput').value.trim();
+                const skinTheme = document.getElementById('skinThemeInput').value.trim();
+
+                const skinIdInput = document.getElementById('skinIdInput').value.trim();
+                if (!skinIdInput) {
+                    alert('スキンIDを入力するか、Auto-Genで生成してください');
+                    return;
+                }
+
+                const skinId = parseInt(skinIdInput);
+                if (isNaN(skinId) || skinId < 100000 || skinId > 99999998) {
+                    alert('スキンIDは100000～99999998の整数である必要があります');
+                    return;
+                }
+
+                const skinIdPadded = skinId.toString().padStart(8, '0');
+
+                const modelType = document.getElementById('skinModelInput').value;
+                const animValue = modelType === 'alex' ? '0x00080000' : '0x00040000';
+
+                // フォルダパスからプレフィックスを生成
+                let folderPrefix = '';
+                if (this.currentTargetFolderPath && this.currentTargetFolderPath.length > 0) {
+                    folderPrefix = this.currentTargetFolderPath
+                        .split('/')
+                        .filter(p => p && p.trim() !== '')
+                        .map(p => p.replace(/\.[^.]+$/, '').toUpperCase())
+                        .join('_') + '_';
+                }
+
+                // スキンのプロパティリスト
+                const skinProperties = [
+                    { key: 'DISPLAYNAME', value: skinName },
+                    { key: 'DISPLAYNAMEID', value: `IDS_${folderPrefix}dlcskin${skinIdPadded}_DISPLAYNAME` }
+                ];
+
+                // THEMENAME（任意）
+                if (skinTheme) {
+                    skinProperties.push({ key: 'THEMENAME', value: skinTheme });
+                    skinProperties.push({ key: 'THEMENAMEID', value: `IDS_${folderPrefix}dlcskin${skinIdPadded}_THEMENAME` });
+                }
+
+                // 必須プロパティ
+                skinProperties.push(
+                    { key: 'ANIM', value: animValue },
+                    { key: 'GAME_FLAGS', value: '0x18' },
+                    { key: 'FREE', value: '1' }
+                );
+
+                // マントが選択されている場合
+                const capeName = `dlccape${skinIdPadded}`;
+                let fullCapeName;
+                if (this.currentTargetFolderPath && this.currentTargetFolderPath.length > 0) {
+                    let folderPath = this.currentTargetFolderPath.slice(0, -1);  // trailing slashを除去
+                    
+                    // PCK内の場合、PCK名 + 相対パスにする
+                    if (this.currentPckFolder) {
+                        fullCapeName = this.currentPckFolder + '/' + folderPath + '/' + capeName + '.png';
+                    } else {
+                        fullCapeName = folderPath + '/' + capeName + '.png';
+                    }
+                } else {
+                    fullCapeName = capeName + '.png';
+                }
+                
+                if (this.selectedCapeData) {
+                    skinProperties.push({ key: 'CAPEPATH', value: fullCapeName });
+                    const capeAsset = this.assets.find(asset => asset.filename.toLowerCase() === fullCapeName.toLowerCase());
+                    if (!capeAsset) {
+                        const newCapeAsset = {
+                            filename: fullCapeName,
+                            typeCode: 1,
+                            dataSize: this.selectedCapeData.byteLength,
+                            dataOffset: 0,
+                            properties: [],
+                            data: new Uint8Array(this.selectedCapeData)
+                        };
+                        this.assets.push(newCapeAsset);
+                    }
+                }
+
+                // 新しいスキンアセットを作成
+                const skinFilename = `dlcskin${skinIdPadded}.png`;
+                let fullSkinFilename;
+                if (this.currentTargetFolderPath && this.currentTargetFolderPath.length > 0) {
+                    let folderPath = this.currentTargetFolderPath.slice(0, -1);  // trailing slashを除去
+                    
+                    // PCK内の場合、PCK名 + 相対パスにする
+                    if (this.currentPckFolder) {
+                        fullSkinFilename = this.currentPckFolder + '/' + folderPath + '/' + skinFilename;
+                    } else {
+                        fullSkinFilename = folderPath + '/' + skinFilename;
+                    }
+                } else {
+                    fullSkinFilename = skinFilename;
+                }
+                
+                const newAsset = {
+                    filename: fullSkinFilename,
+                    typeCode: 0,
+                    dataSize: this.selectedSkinData.byteLength,
+                    dataOffset: 0,
+                    properties: skinProperties,
+                    data: new Uint8Array(this.selectedSkinData)
+                };
+
+                // ネストされたPCK内に追加する場合
+                if (this.currentPckFolder) {
+                    const pckAsset = this.assets.find(asset => 
+                        (asset.typeCode === 5 || asset.typeCode === 8 || asset.typeCode === 11) &&
+                        asset.filename === this.currentPckFolder
+                    );
+                    
+                    if (pckAsset) {
+                        try {
+                            // PCK内部を解析（メタデータも取得）
+                            const pckData = pckAsset.data.buffer.slice(pckAsset.data.byteOffset, pckAsset.data.byteOffset + pckAsset.data.byteLength);
+                            const pckParser = new PckParser(pckData);
+                            const childAssets = pckParser.parse();
+                            
+                            // PCKのメタデータを保存
+                            const originalPckType = pckParser.pckType;
+                            const originalLittleEndian = pckParser.isLittleEndian;
+                            
+                            console.log('Original PCK metadata:', {pckType: originalPckType, littleEndian: originalLittleEndian});
+                            
+                            // スキンをPCK相対パスに変換 (Skins.pck/Skins/dlcskin.png → Skins/dlcskin.png)
+                            const pckRelativeFilename = fullSkinFilename.substring(this.currentPckFolder.length + 1);
+                            const pckSkinAsset = {
+                                filename: pckRelativeFilename,
+                                typeCode: 0,
+                                dataSize: this.selectedSkinData.byteLength,
+                                dataOffset: 0,
+                                properties: skinProperties,
+                                data: new Uint8Array(this.selectedSkinData)
+                            };
+                            
+                            childAssets.push(pckSkinAsset);
+                            
+                            // マントも追加
+                            if (this.selectedCapeData) {
+                                const pckRelativeCapeName = fullCapeName.substring(this.currentPckFolder.length + 1);
+                                const pckCapeAsset = {
+                                    filename: pckRelativeCapeName,
+                                    typeCode: 1,
+                                    dataSize: this.selectedCapeData.byteLength,
+                                    dataOffset: 0,
+                                    properties: [],
+                                    data: new Uint8Array(this.selectedCapeData)
+                                };
+                                childAssets.push(pckCapeAsset);
+                            }
+                            
+                            // PCKを元のフォーマットで再エンコード
+                            const updatedPckBuffer = this.encodePck(childAssets, originalPckType, originalLittleEndian);
+                            pckAsset.data = new Uint8Array(updatedPckBuffer);
+                            pckAsset.dataSize = updatedPckBuffer.byteLength;
+                            
+                            this.selectedAsset = pckSkinAsset;
+                        } catch (error) {
+                            console.error('ネストされたPCKの更新に失敗:', error);
+                            alert('ネストされたPCKへのスキン追加に失敗しました: ' + error.message);
+                            return;
+                        }
+                    } else {
+                        alert('PCKファイルが見つかりません');
+                        return;
+                    }
+                } else {
+                    // メインレベルに追加
+                    this.assets.push(newAsset);
+                    
+                    if (this.selectedCapeData) {
+                        const capeAsset = this.assets.find(asset => asset.filename.toLowerCase() === fullCapeName.toLowerCase());
+                        if (!capeAsset) {
+                            const newCapeAsset = {
+                                filename: fullCapeName,
+                                typeCode: 1,
+                                dataSize: this.selectedCapeData.byteLength,
+                                dataOffset: 0,
+                                properties: [],
+                                data: new Uint8Array(this.selectedCapeData)
+                            };
+                            this.assets.push(newCapeAsset);
+                        }
+                    }
+                    
+                    this.selectedAsset = newAsset;
+                }
+
+                // .locファイルにスキン情報を書き込む
+                this.addSkinNameToLoc(skinName, skinTheme, skinIdPadded, this.currentTargetFolderPath);
+
+                // UI更新
+                this.displayAssets();
+                this.selectAsset(newAsset, document.querySelector('.asset-item:last-child'), this.assets.length - 1);
+                
+                this.closeImportModal();
+                
+                let message = `スキンID: ${skinIdPadded} (${modelType}モデル)を追加しました`;
+                if (skinName) {
+                    message = `スキン「${skinName}」を追加しました\n` + message;
+                }
+                if (skinTheme) {
+                    message += `\nテーマ: ${skinTheme}`;
+                }
+                message += `\n.locファイルに情報を記録しました`;
+                if (this.selectedCapeData) {
+                    message += `\nマント「${fullCapeName}」も追加しました`;
+                }
+                alert(message);
+            }
+
+            addSkinNameToLoc(skinName, skinTheme, skinIdPadded, folderPath = '') {
+                const locAsset = this.assets.find(asset => asset.filename.toLowerCase().endsWith('.loc'));
+                if (!locAsset) {
+                    return;
+                }
+
+                try {
+                    const locParser = new LOCParser(locAsset.data.buffer.slice(locAsset.data.byteOffset, locAsset.data.byteOffset + locAsset.data.byteLength));
+                    const parseResult = locParser.parse();
+                    
+                    if (!parseResult) {
+                        return;
+                    }
+
+                    // フォルダパスからプレフィックスを生成
+                    let folderPrefix = '';
+                    if (folderPath && folderPath.length > 0) {
+                        // "Skins/" → "SKINS_", "Textures/Skins/" → "TEXTURES_SKINS_"
+                        folderPrefix = folderPath
+                            .split('/')
+                            .filter(p => p && p.trim() !== '')
+                            .map(p => p.replace(/\.[^.]+$/, '').toUpperCase())
+                            .join('_') + '_';
+                    }
+
+                    const skinLocKey = `IDS_${folderPrefix}dlcskin${skinIdPadded}_DISPLAYNAME`;
+                    parseResult.languages.forEach(language => {
+                        if (!parseResult.locData[language]) {
+                            parseResult.locData[language] = {};
+                        }
+                        parseResult.locData[language][skinLocKey] = skinName;
+                    });
+
+                    if (skinTheme) {
+                        const themeLocKey = `IDS_${folderPrefix}dlcskin${skinIdPadded}_THEMENAME`;
+                        parseResult.languages.forEach(language => {
+                            if (!parseResult.locData[language]) {
+                                parseResult.locData[language] = {};
+                            }
+                            parseResult.locData[language][themeLocKey] = skinTheme;
+                        });
+                    }
+
+                    if (!parseResult.keys.includes(skinLocKey)) {
+                        parseResult.keys.push(skinLocKey);
+                    }
+                    if (skinTheme) {
+                        const themeLocKey = `IDS_${folderPrefix}dlcskin${skinIdPadded}_THEMENAME`;
+                        if (!parseResult.keys.includes(themeLocKey)) {
+                            parseResult.keys.push(themeLocKey);
+                        }
+                    }
+
+                    const updatedLocBuffer = this.buildLocBuffer(parseResult);
+                    locAsset.data = new Uint8Array(updatedLocBuffer);
+                    locAsset.dataSize = updatedLocBuffer.byteLength;
+                } catch (error) {
+                    // LogError silently
+                }
+            }
+
+
+            buildLocBuffer(locFileData) {
+                try {
+                    const { 
+                        languages, 
+                        locData, 
+                        keys, 
+                        versions = {}, 
+                        hasUidsInEntry = {}, 
+                        hasUids = false, 
+                        loc_type = 2 
+                    } = locFileData;
+                    
+                    const encoder = new TextEncoder();
+                    const chunks = [];
+                    let totalOffset = 0;
+
+                    // Header
+                    {
+                        const buf = new ArrayBuffer(8);
+                        const view = new DataView(buf);
+                        view.setUint32(0, 2, false);
+                        view.setUint32(4, languages.length, false);
+                        chunks.push(new Uint8Array(buf));
+                        totalOffset += 8;
+                    }
+
+                    // Keys
+                    {
+                        const useUniqueIds = keys.length > 0 && keys[0].match(/^[0-9A-F]{8}$/);
+                        
+                        const keyBuf = new ArrayBuffer(1 + 4);
+                        const keyView = new DataView(keyBuf);
+                        keyView.setUint8(0, useUniqueIds ? 1 : 0);
+                        keyView.setUint32(1, keys.length, false);
+                        chunks.push(new Uint8Array(keyBuf));
+                        totalOffset += 5;
+
+                        keys.forEach((key, idx) => {
+                            if (useUniqueIds && key.match(/^[0-9A-F]{8}$/)) {
+                                const buf = new ArrayBuffer(4);
+                                new DataView(buf).setUint32(0, parseInt(key, 16), false);
+                                chunks.push(new Uint8Array(buf));
+                                totalOffset += 4;
+                            } else {
+                                const keyBytes = encoder.encode(key);
+                                const buf = new ArrayBuffer(2 + keyBytes.length);
+                                new DataView(buf).setUint16(0, keyBytes.length, false);
+                                new Uint8Array(buf, 2).set(keyBytes);
+                                chunks.push(new Uint8Array(buf));
+                                totalOffset += 2 + keyBytes.length;
+                            }
+                        });
+                    }
+
+                    // Languages and entries
+                    const entryBufs = [];
+                    languages.forEach((lang, langIdx) => {
+                        // Language name
+                        const langBytes = encoder.encode(lang);
+                        const langBuf = new ArrayBuffer(2 + langBytes.length);
+                        new DataView(langBuf).setUint16(0, langBytes.length, false);
+                        new Uint8Array(langBuf, 2).set(langBytes);
+                        chunks.push(new Uint8Array(langBuf));
+                        totalOffset += 2 + langBytes.length;
+
+                        // Build entry
+                        const useUniqueIds = keys.length > 0 && keys[0].match(/^[0-9A-F]{8}$/);
+                        const entryChunks = [];
+
+                        // version
+                        {
+                            const version = (versions && versions[lang]) || loc_type || 2;
+                            const buf = new ArrayBuffer(4);
+                            new DataView(buf).setUint32(0, version, false);
+                            entryChunks.push(new Uint8Array(buf));
+
+                            if (version > 0) {
+                                const hasUidsValue = hasUidsInEntry?.[lang] ?? hasUids ?? (useUniqueIds ? 1 : 0);
+                                entryChunks.push(new Uint8Array([hasUidsValue ? 1 : 0]));
+                            }
+                        }
+
+                        // Language name (repeat)
+                        {
+                            const buf = new ArrayBuffer(2 + langBytes.length);
+                            new DataView(buf).setUint16(0, langBytes.length, false);
+                            new Uint8Array(buf, 2).set(langBytes);
+                            entryChunks.push(new Uint8Array(buf));
+                        }
+
+                        // Count
+                        {
+                            const buf = new ArrayBuffer(4);
+                            new DataView(buf).setUint32(0, keys.length, false);
+                            entryChunks.push(new Uint8Array(buf));
+                        }
+
+                        // Values
+                        keys.forEach((key, idx) => {
+                            const value = (locData[lang] && locData[lang][key]) || '';
+                            const valueBytes = encoder.encode(value);
+                            const buf = new ArrayBuffer(2 + valueBytes.length);
+                            new DataView(buf).setUint16(0, valueBytes.length, false);
+                            new Uint8Array(buf, 2).set(valueBytes);
+                            entryChunks.push(new Uint8Array(buf));
+                        });
+
+                        // Assemble entry
+                        let entrySize = 0;
+                        entryChunks.forEach(c => entrySize += c.length);
+                        const entryBuf = new ArrayBuffer(entrySize);
+                        let pos = 0;
+                        entryChunks.forEach(c => {
+                            new Uint8Array(entryBuf, pos).set(c);
+                            pos += c.length;
+                        });
+                        entryBufs.push(new Uint8Array(entryBuf));
+
+                        // Buffer size
+                        {
+                            const buf = new ArrayBuffer(4);
+                            new DataView(buf).setUint32(0, entrySize, false);
+                            chunks.push(new Uint8Array(buf));
+                            totalOffset += 4 + entrySize;
+                        }
+                    });
+
+                    // Add entries
+                    entryBufs.forEach(buf => chunks.push(buf));
+
+                    // Combine
+                    let totalSize = 0;
+                    chunks.forEach(c => totalSize += c.length);
+                    
+                    const result = new ArrayBuffer(totalSize);
+                    let offset = 0;
+                    chunks.forEach(c => {
+                        new Uint8Array(result, offset).set(c);
+                        offset += c.length;
+                    });
+                    
+                    return result;
+                } catch (error) {
+                    console.error('buildLocBuffer error:', error);
+                    throw error;
+                }
+            }
+
+            closeImportModal() {
+                const modal = document.getElementById('importModal');
+                modal.classList.remove('active');
+                this.selectedSkinData = null;
+                this.selectedCapeData = null;
+                this.selectedCapeName = null;
+            }
+
+            generateSkinId() {
+                // 既存スキンのIDを抽出
+                const existingIds = new Set();
+                this.assets.forEach(asset => {
+                    const filename = asset.filename.toLowerCase();
+                    if (filename.startsWith('dlcskin') && filename.endsWith('.png')) {
+                        const idStr = filename.substring(7, 15); // "dlcskin"(7文字)の後の8文字
+                        if (/^\d{8}$/.test(idStr)) {
+                            existingIds.add(parseInt(idStr));
+                        }
+                    }
+                });
+
+                // 重複しないランダムなIDを生成
+                let newId;
+                let attempts = 0;
+                do {
+                    newId = Math.floor(Math.random() * (99999998 - 100000 + 1)) + 100000;
+                    attempts++;
+                    if (attempts > 1000) {
+                        alert('新しいスキンIDの生成に失敗しました。手動でIDを入力してください。');
+                        return;
+                    }
+                } while (existingIds.has(newId));
+
+                // IDをフォームに設定
+                document.getElementById('skinIdInput').value = newId;
+            }
+
+            // ========== プロパティ編集機能 ==========
+            updateProperty(input) {
+                if (!this.selectedAsset) return;
+                
+                const index = parseInt(input.dataset.index);
+                const type = input.dataset.type;
+                const value = input.value.trim();
+                
+                if (type === 'key') {
+                    if (!value) {
+                        alert('キーは空にできません');
+                        input.value = this.selectedAsset.properties[index].key;
+                        return;
+                    }
+                    this.selectedAsset.properties[index].key = value;
+                } else if (type === 'value') {
+                    this.selectedAsset.properties[index].value = value;
+                }
+                
+                // 保存ボタンを有効化
+                document.getElementById('menuSave').style.opacity = '1';
+                document.getElementById('menuSave').style.pointerEvents = 'auto';
+            }
+
+            deleteAsset(index, parentPckInfo, childIndex, assetToDelete) {
+                // ネストされたPCK内のアセットの場合
+                if (parentPckInfo && childIndex !== undefined && assetToDelete) {
+                    const asset = assetToDelete;
+                    if (!confirm(`アセット ${this.escapeHtml(asset.filename)} を削除してもいいですか？`)) {
+                        return;
+                    }
+                    
+                    // スキンの場合、locファイルからも削除（親PCK内のLOCと大元のLOCから）
+                    if (asset.typeCode === 0 && asset.properties) {
+                        const displayNameIdProp = asset.properties.find(p => p.key === 'DISPLAYNAMEID');
+                        const themeNameIdProp = asset.properties.find(p => p.key === 'THEMENAMEID');
+                        
+                        if (displayNameIdProp) {
+                            // 親PCK内のLOCから削除
+                            this.removeFromLoc(displayNameIdProp.value, parentPckInfo.asset);
+                            // 大元のLOCファイルからも削除
+                            this.removeFromLoc(displayNameIdProp.value);
+                        }
+                        if (themeNameIdProp) {
+                            // 親PCK内のLOCから削除
+                            this.removeFromLoc(themeNameIdProp.value, parentPckInfo.asset);
+                            // 大元のLOCファイルからも削除
+                            this.removeFromLoc(themeNameIdProp.value);
+                        }
+                    }
+                    
+                    // 親PCKから子アセットを削除
+                    const pckAsset = parentPckInfo.asset;
+                    const childAssets = this.parsePckAsset(pckAsset);
+                    
+                    if (!childAssets || childIndex >= childAssets.length) {
+                        alert('削除に失敗しました：アセットが見つかりません');
+                        return;
+                    }
+                    
+                    // 子アセットを削除
+                    childAssets.splice(childIndex, 1);
+                    
+                    // PCKを再エンコード
+                    const originalPckType = pckAsset.typeCode === 5 ? 3 : (pckAsset.typeCode === 8 ? 4 : 5);
+                    const originalLittleEndian = this.parser ? this.parser.littleEndian : false;
+                    
+                    console.log(`Reencoding PCK after deletion: type=${originalPckType}, littleEndian=${originalLittleEndian}, remaining assets=${childAssets.length}`);
+                    
+                    const updatedPckBuffer = this.encodePck(childAssets, originalPckType, originalLittleEndian);
+                    pckAsset.data = new Uint8Array(updatedPckBuffer);
+                    pckAsset.dataSize = updatedPckBuffer.byteLength;
+                    
+                    console.log(`Updated PCK size: ${pckAsset.dataSize} bytes`);
+                } else {
+                    // メインのassetsから削除（従来の処理）
+                    const asset = this.assets[index];
+                    if (!confirm(`アセット [${index}] ${this.escapeHtml(asset.filename)} を削除してもいいですか？`)) {
+                        return;
+                    }
+                    
+                    // スキンの場合、locファイルからも削除
+                    if (asset.typeCode === 0 && asset.properties) {
+                        const displayNameIdProp = asset.properties.find(p => p.key === 'DISPLAYNAMEID');
+                        const themeNameIdProp = asset.properties.find(p => p.key === 'THEMENAMEID');
+                        
+                        if (displayNameIdProp) {
+                            this.removeFromLoc(displayNameIdProp.value);
+                        }
+                        if (themeNameIdProp) {
+                            this.removeFromLoc(themeNameIdProp.value);
+                        }
+                    }
+                    
+                    this.assets.splice(index, 1);
+                }
+                
+                // 保存ボタンを有効化
+                document.getElementById('menuSave').style.opacity = '1';
+                document.getElementById('menuSave').style.pointerEvents = 'auto';
+                
+                // UI更新
+                this.displayAssets();
+                
+                // 詳細をクリア
+                const container = document.getElementById('detailsContent');
+                container.innerHTML = '<div class="empty-message"><div class="empty-icon">ℹ️</div>アセット情報がここに表示されます</div>';
+            }
+            
+            removeFromLoc(keyToRemove, parentPckAsset = null) {
+                let locAsset;
+                
+                // 親PCKが指定されている場合、その中のLOCファイルを探す
+                if (parentPckAsset) {
+                    const childAssets = this.parsePckAsset(parentPckAsset);
+                    if (childAssets) {
+                        locAsset = childAssets.find(asset => asset.filename.toLowerCase().endsWith('.loc'));
+                    }
+                } else {
+                    // メインのassetsからLOCを探す
+                    locAsset = this.assets.find(asset => asset.filename.toLowerCase().endsWith('.loc'));
+                }
+                
+                if (!locAsset) {
+                    return;
+                }
+
+                try {
+                    const locParser = new LOCParser(locAsset.data.buffer.slice(locAsset.data.byteOffset, locAsset.data.byteOffset + locAsset.data.byteLength));
+                    const parseResult = locParser.parse();
+                    
+                    if (!parseResult) {
+                        return;
+                    }
+
+                    // キーを削除
+                    const keyIndex = parseResult.keys.indexOf(keyToRemove);
+                    if (keyIndex !== -1) {
+                        parseResult.keys.splice(keyIndex, 1);
+                        
+                        // 各言語からも削除
+                        parseResult.languages.forEach(language => {
+                            if (parseResult.locData[language] && parseResult.locData[language][keyToRemove]) {
+                                delete parseResult.locData[language][keyToRemove];
+                            }
+                        });
+                        
+                        // 更新されたlocファイルを再構築
+                        const updatedLocBuffer = this.buildLocBuffer(parseResult);
+                        locAsset.data = new Uint8Array(updatedLocBuffer);
+                        locAsset.dataSize = updatedLocBuffer.byteLength;
+                    }
+                } catch (error) {
+                    console.error('locファイルからのキー削除に失敗:', error);
+                }
+            }
+
+            deleteProperty(index) {
+                if (!this.selectedAsset) return;
+                
+                const key = this.selectedAsset.properties[index].key;
+                if (!confirm(`プロパティ「${key}」を削除してもいいですか？`)) {
+                    return;
+                }
+                
+                this.selectedAsset.properties.splice(index, 1);
+                
+                // 保存ボタンを有効化
+                document.getElementById('menuSave').style.opacity = '1';
+                document.getElementById('menuSave').style.pointerEvents = 'auto';
+                
+                // 詳細を再描画
+                this.displayDetails(this.selectedAsset);
+            }
+
+            addProperty() {
+                if (!this.selectedAsset) return;
+                
+                if (!this.selectedAsset.properties) {
+                    this.selectedAsset.properties = [];
+                }
+                
+                // 新しいプロパティを追加
+                this.selectedAsset.properties.push({
+                    key: 'KEY',
+                    value: 'VALUE'
+                });
+                
+                // 保存ボタンを有効化
+                document.getElementById('menuSave').style.opacity = '1';
+                document.getElementById('menuSave').style.pointerEvents = 'auto';
+                
+                // 詳細を再描画
+                this.displayDetails(this.selectedAsset);
+            }
+
+            // ========== 画像置き換え機能 ==========
+            replaceAssetImage(asset, parentPckInfo, childIndex) {
+                if (!asset) {
+                    alert('アセットが選択されていません');
+                    return;
+                }
+                
+                const input = document.getElementById('pngReplaceInput');
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                            const newData = new Uint8Array(evt.target.result);
+                            asset.data = newData;
+                            asset.dataSize = newData.length;
+                            
+                            // ネストされたPCK内のアセットの場合、親PCKを再エンコード
+                            if (parentPckInfo && childIndex !== undefined) {
+                                const pckAsset = parentPckInfo.asset;
+                                const childAssets = this.parsePckAsset(pckAsset);
+                                
+                                if (childAssets && childIndex < childAssets.length) {
+                                    // 子アセットを更新
+                                    childAssets[childIndex] = asset;
+                                    
+                                    // PCKを再エンコード
+                                    const originalPckType = pckAsset.typeCode === 5 ? 3 : (pckAsset.typeCode === 8 ? 4 : 5);
+                                    const originalLittleEndian = this.parser ? this.parser.littleEndian : false;
+                                    
+                                    const updatedPckBuffer = this.encodePck(childAssets, originalPckType, originalLittleEndian);
+                                    pckAsset.data = new Uint8Array(updatedPckBuffer);
+                                    pckAsset.dataSize = updatedPckBuffer.byteLength;
+                                }
+                            }
+                            
+                            // 選択中のアセットの場合、プレビューを更新
+                            if (this.selectedAsset === asset) {
+                                this.displayImage(asset);
+                            }
+                            
+                            alert(`${asset.filename} を更新しました`);
+                            
+                            // 保存ボタンを有効化
+                            document.getElementById('menuSave').style.opacity = '1';
+                            document.getElementById('menuSave').style.pointerEvents = 'auto';
+                            
+                            // UI更新
+                            this.displayAssets();
+                        };
+                        reader.readAsArrayBuffer(file);
+                    }
+                    input.value = '';
+                };
+                input.click();
+            }
+
+            // 後方互換性のために保持
+            replacePng() {
+                if (!this.selectedAsset) {
+                    alert('アセットを選択してください');
+                    return;
+                }
+                this.replaceAssetImage(this.selectedAsset, null, null);
+            }
+
+            // ========== LOC編集機能 ==========
+            updateLocValue(input) {
+                if (!this.currentLocData || !this.selectedAsset) return;
+                
+                const key = input.dataset.key;
+                const lang = input.dataset.lang;
+                const value = input.value;
+                
+                if (!this.currentLocData.locData[lang]) {
+                    this.currentLocData.locData[lang] = {};
+                }
+                
+                this.currentLocData.locData[lang][key] = value;
+                
+                // LOCバッファを再構築
+                this.rebuildLocBuffer();
+            }
+        }
+
+        // アプリケーション起動
+        let viewer;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, initializing viewer...');
+            viewer = new PckViewer();
+            window.viewer = viewer; // グローバルに明示的に公開
+            console.log('Viewer initialized');
+
+            // モーダルの外側をクリックで閉じる
+            document.getElementById('skinModal').addEventListener('click', (e) => {
+                if (e.target.id === 'skinModal') {
+                    viewer.closeSkinModal();
+                }
+            });
+            
+            // 保存ダイアログの外側をクリックで閉じる
+            document.getElementById('saveDialogOverlay').addEventListener('click', (e) => {
+                if (e.target.id === 'saveDialogOverlay') {
+                    viewer.closeSaveDialog();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
