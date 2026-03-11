@@ -1166,6 +1166,82 @@
             image-rendering: pixelated;
         }
 
+        .skin-dual-preview {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 10px 0;
+        }
+
+        .skin-preview-panel {
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            background: #1a1a1a;
+            overflow: hidden;
+            min-height: 230px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .skin-preview-panel-title {
+            padding: 8px 10px;
+            font-size: 11px;
+            color: #b8b8b8;
+            background: #2a2a2a;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        .skin-layout-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            background: repeating-conic-gradient(#2a2a2a 0% 25%, #1e1e1e 0% 50%) 50% / 20px 20px;
+        }
+
+        .skin-layout-image {
+            max-width: 100%;
+            max-height: 280px;
+            image-rendering: pixelated;
+            border: 1px solid #3e3e42;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .skin-3d-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 50% 35%, #2e2e2e 0%, #1b1b1b 60%, #141414 100%);
+            position: relative;
+        }
+
+        .skin-3d-canvas {
+            width: 100%;
+            height: 100%;
+            min-height: 230px;
+            image-rendering: pixelated;
+            cursor: grab;
+            touch-action: none;
+        }
+
+        .skin-3d-canvas.dragging {
+            cursor: grabbing;
+        }
+
+        .skin-3d-model-label {
+            position: absolute;
+            right: 8px;
+            bottom: 8px;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: rgba(0, 0, 0, 0.45);
+            color: #cccccc;
+            border: 1px solid #3e3e42;
+        }
+
         .save-dialog-overlay {
             display: none;
             position: fixed;
@@ -1279,6 +1355,67 @@
 
         .save-dialog-btn-secondary:hover {
             background: #505050;
+        }
+
+        .app-toast-container {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 2100;
+            pointer-events: none;
+        }
+
+        .app-toast {
+            min-width: 240px;
+            max-width: min(420px, calc(100vw - 36px));
+            padding: 12px 14px;
+            border-radius: 6px;
+            border: 1px solid #3e3e42;
+            background: rgba(37, 37, 38, 0.96);
+            color: #d4d4d4;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+            font-size: 12px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+
+        .app-toast.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .app-toast.success {
+            border-color: #2e7d32;
+        }
+
+        .app-toast.error {
+            border-color: #c62828;
+        }
+
+        .app-toast.warning {
+            border-color: #ef6c00;
+        }
+
+        .app-dialog {
+            max-width: 420px;
+        }
+
+        .app-dialog-message {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #d4d4d4;
+            white-space: pre-wrap;
+        }
+
+        .app-dialog-input {
+            width: 100%;
+            margin-top: 14px;
         }
 
         /* モバイル対応 */
@@ -1464,6 +1601,10 @@
                 min-width: auto;
                 margin-bottom: 4px;
             }
+
+            .skin-dual-preview {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -1471,10 +1612,10 @@
     <!-- メニューバー -->
     <div class="menu-bar">
         <button class="mobile-menu-toggle" onclick="viewer.toggleSidebar()" aria-label="メニュー">☰</button>
-        <div class="menu-item" onclick="viewer.showNewPackageDialog()">📄 新規作成</div>
-        <div class="menu-item" onclick="viewer.openFile()">📁 ファイルを開く</div>
-        <div class="menu-item" onclick="viewer.saveFile()" id="menuSave" style="opacity: 0.5; pointer-events: none;">💾 保存</div>
-        <div class="menu-item" onclick="viewer.closeFile()" id="menuClose" style="opacity: 0.5; pointer-events: none;">✕ 閉じる</div>
+        <div class="menu-item" id="menuNew">📄 新規作成</div>
+        <div class="menu-item" id="menuOpen">📁 ファイルを開く</div>
+        <div class="menu-item" id="menuSave" style="opacity: 0.5; pointer-events: none;">💾 保存</div>
+        <div class="menu-item" id="menuClose" style="opacity: 0.5; pointer-events: none;">✕ 閉じる</div>
     </div>
 
     <!-- 新規作成ダイアログ -->
@@ -1517,6 +1658,11 @@
     <div class="save-dialog-overlay" id="saveDialogOverlay">
         <div class="save-dialog">
             <div class="save-dialog-title">💾 PCKファイルを保存</div>
+
+            <div class="save-dialog-field">
+                <label class="save-dialog-label">ファイル名</label>
+                <input type="text" class="save-dialog-input" id="saveFilenameInput" placeholder="output.pck">
+            </div>
             
             <div class="save-dialog-field">
                 <label class="save-dialog-label">エンディアン</label>
@@ -1642,9 +1788,7 @@
                     <label class="form-label">スキン画像ファイル</label>
                     <input type="file" id="skinFileInput" class="form-input" accept=".png" onchange="viewer.handleSkinFileSelect(this.files[0])" />
                 </div>
-                <div id="skinPreviewArea" style="display: none;">
-                    <img id="skinPreview" class="preview-image" />
-                </div>
+                <div id="skinPreviewArea" style="display: none;"></div>
                 <div class="form-group">
                     <label class="form-label">スキン名（任意）</label>
                     <input type="text" id="skinNameInput" class="form-input" placeholder="例: Custom Skin" />
@@ -1685,7 +1829,26 @@
         </div>
     </div>
 
-    <input type="file" id="fileInput" accept=".pck" />
+    <div class="modal-overlay" id="appDialogOverlay">
+        <div class="modal-dialog app-dialog">
+            <div class="modal-header">
+                <span id="appDialogTitle">確認</span>
+                <button class="modal-close" id="appDialogCloseButton">&times;</button>
+            </div>
+            <div class="modal-content">
+                <div class="app-dialog-message" id="appDialogMessage"></div>
+                <input type="text" id="appDialogInput" class="form-input app-dialog-input" style="display: none;" />
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="appDialogCancelButton">キャンセル</button>
+                <button class="btn-primary" id="appDialogConfirmButton">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-toast-container" id="appToastContainer"></div>
+
+    <input type="file" id="fileInput" accept=".pck" style="display:none;" />
     <input type="file" id="pngReplaceInput" accept=".png" style="display: none;" />
 
     <script>
@@ -2074,7 +2237,169 @@
                 this.currentTargetFolderNode = null;
                 this.currentTargetFolderPath = '';
                 this.currentPckFolder = null;
+                this.selectedSkinDataUrl = null;
+                this.assetSkin3dFrame = null;
+                this.importSkin3dFrame = null;
+                this.assetSkin3dCleanup = null;
+                this.importSkin3dCleanup = null;
+                // レイヤー表示状態
+                this.showFirstLayer = true;
+                this.showSecondLayer = true;
+                this.showCapeLayer = true;
+                this.showCustomBoxes = true;
+                this.activeDialogResolver = null;
+                this.activeDialogKeyHandler = null;
                 this.setupEventListeners();
+            }
+
+            showNotice(message, type = 'info', duration = 2600) {
+                const container = document.getElementById('appToastContainer');
+                if (!container) {
+                    console[type === 'error' ? 'error' : 'log'](message);
+                    return;
+                }
+
+                const totalDuration = Math.max(duration, 1800 + String(message ?? '').length * 24);
+
+                const toast = document.createElement('div');
+                toast.className = `app-toast ${type}`;
+                toast.textContent = String(message ?? '');
+                container.appendChild(toast);
+
+                requestAnimationFrame(() => {
+                    toast.classList.add('active');
+                });
+
+                window.setTimeout(() => {
+                    toast.classList.remove('active');
+                    window.setTimeout(() => {
+                        toast.remove();
+                    }, 180);
+                }, totalDuration);
+            }
+
+            showDialog({
+                title = '確認',
+                message = '',
+                confirmText = 'OK',
+                cancelText = 'キャンセル',
+                showCancel = true,
+                defaultValue = '',
+                placeholder = '',
+                inputMode = false
+            } = {}) {
+                const overlay = document.getElementById('appDialogOverlay');
+                const titleEl = document.getElementById('appDialogTitle');
+                const messageEl = document.getElementById('appDialogMessage');
+                const inputEl = document.getElementById('appDialogInput');
+                const confirmBtn = document.getElementById('appDialogConfirmButton');
+                const cancelBtn = document.getElementById('appDialogCancelButton');
+                const closeBtn = document.getElementById('appDialogCloseButton');
+
+                if (!overlay || !titleEl || !messageEl || !inputEl || !confirmBtn || !cancelBtn || !closeBtn) {
+                    return Promise.resolve({ confirmed: false, value: null });
+                }
+
+                if (this.activeDialogResolver) {
+                    this.closeDialog({ confirmed: false, value: null });
+                }
+
+                titleEl.textContent = title;
+                messageEl.textContent = String(message ?? '');
+                confirmBtn.textContent = confirmText;
+                cancelBtn.textContent = cancelText;
+                cancelBtn.style.display = showCancel ? 'inline-flex' : 'none';
+                closeBtn.style.display = showCancel ? 'inline-flex' : 'none';
+
+                inputEl.style.display = inputMode ? 'block' : 'none';
+                inputEl.value = defaultValue;
+                inputEl.placeholder = placeholder;
+
+                overlay.classList.add('active');
+                document.body.classList.add('modal-open');
+
+                return new Promise((resolve) => {
+                    this.activeDialogResolver = resolve;
+
+                    overlay.onclick = (e) => {
+                        if (e.target === overlay && showCancel) {
+                            this.closeDialog({ confirmed: false, value: null });
+                        }
+                    };
+                    closeBtn.onclick = () => this.closeDialog({ confirmed: false, value: null });
+                    cancelBtn.onclick = () => this.closeDialog({ confirmed: false, value: null });
+                    confirmBtn.onclick = () => this.closeDialog({ confirmed: true, value: inputMode ? inputEl.value : null });
+
+                    this.activeDialogKeyHandler = (e) => {
+                        if (e.key === 'Escape' && showCancel) {
+                            e.preventDefault();
+                            this.closeDialog({ confirmed: false, value: null });
+                        }
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            this.closeDialog({ confirmed: true, value: inputMode ? inputEl.value : null });
+                        }
+                    };
+                    document.addEventListener('keydown', this.activeDialogKeyHandler);
+
+                    window.setTimeout(() => {
+                        if (inputMode) {
+                            inputEl.focus();
+                            inputEl.select();
+                        } else {
+                            confirmBtn.focus();
+                        }
+                    }, 0);
+                });
+            }
+
+            closeDialog(result = { confirmed: false, value: null }) {
+                const overlay = document.getElementById('appDialogOverlay');
+                const confirmBtn = document.getElementById('appDialogConfirmButton');
+                const cancelBtn = document.getElementById('appDialogCancelButton');
+                const closeBtn = document.getElementById('appDialogCloseButton');
+                if (overlay) {
+                    overlay.classList.remove('active');
+                    overlay.onclick = null;
+                }
+                if (confirmBtn) confirmBtn.onclick = null;
+                if (cancelBtn) cancelBtn.onclick = null;
+                if (closeBtn) closeBtn.onclick = null;
+                document.body.classList.remove('modal-open');
+                if (this.activeDialogKeyHandler) {
+                    document.removeEventListener('keydown', this.activeDialogKeyHandler);
+                    this.activeDialogKeyHandler = null;
+                }
+                const resolver = this.activeDialogResolver;
+                this.activeDialogResolver = null;
+                if (resolver) {
+                    resolver(result);
+                }
+            }
+
+            async showConfirm(message, options = {}) {
+                const result = await this.showDialog({
+                    title: options.title || '確認',
+                    message,
+                    confirmText: options.confirmText || 'OK',
+                    cancelText: options.cancelText || 'キャンセル',
+                    showCancel: true
+                });
+                return result.confirmed;
+            }
+
+            async showPrompt(message, defaultValue = '', options = {}) {
+                const result = await this.showDialog({
+                    title: options.title || '入力',
+                    message,
+                    confirmText: options.confirmText || 'OK',
+                    cancelText: options.cancelText || 'キャンセル',
+                    showCancel: true,
+                    inputMode: true,
+                    defaultValue,
+                    placeholder: options.placeholder || ''
+                });
+                return result.confirmed ? result.value : null;
             }
 
             // PCKアセットを正しくエンコード
@@ -2229,6 +2554,13 @@
                     console.error('fileInput element not found in setupEventListeners');
                 }
 
+                const skinModelInput = document.getElementById('skinModelInput');
+                if (skinModelInput) {
+                    skinModelInput.addEventListener('change', () => {
+                        this.updateImportSkinPreview3D();
+                    });
+                }
+
                 // モバイルでサイドバー外をタップしたら閉じる
                 document.addEventListener('click', (e) => {
                     const sidebar = document.querySelector('.sidebar');
@@ -2274,16 +2606,16 @@
                 document.getElementById('newPackageDialogOverlay').style.display = 'none';
             }
 
-            createNewPackage() {
+            async createNewPackage() {
                 const packageName = document.getElementById('newPackageName').value.trim();
                 if (!packageName) {
-                    alert('パック名を入力してください');
+                    this.showNotice('パック名を入力してください', 'warning');
                     return;
                 }
 
                 const packIdStr = document.getElementById('newPackagePACKID').value.trim();
                 if (!packIdStr) {
-                    alert('PACKIDを入力してください');
+                    this.showNotice('PACKIDを入力してください', 'warning');
                     return;
                 }
 
@@ -2292,12 +2624,12 @@
                 const MIN_PACK_ID = 0;
 
                 if (isNaN(packId)) {
-                    alert('PACKIDは整数である必要があります');
+                    this.showNotice('PACKIDは整数である必要があります', 'warning');
                     return;
                 }
 
                 if (packId < MIN_PACK_ID || packId > MAX_PACK_ID) {
-                    alert(`PACKIDは${MIN_PACK_ID}～${MAX_PACK_ID}（0x${MAX_PACK_ID.toString(16).toUpperCase()}）の範囲内である必要があります`);
+                    this.showNotice(`PACKIDは${MIN_PACK_ID}～${MAX_PACK_ID}（0x${MAX_PACK_ID.toString(16).toUpperCase()}）の範囲内である必要があります`, 'warning');
                     return;
                 }
 
@@ -2363,35 +2695,46 @@
                 document.getElementById('menuClose').style.opacity = '1';
                 document.getElementById('menuClose').style.pointerEvents = 'auto';
 
-                alert(`新しいPCKパッケージを作成しました: ${packageName}`);
+                this.showNotice(`新しいPCKパッケージを作成しました: ${packageName}`, 'success');
             }
 
             openFile() {
                 const fileInput = document.getElementById('fileInput');
                 if (!fileInput) {
                     console.error('fileInput element not found');
-                    alert('エラー: ファイル入力要素が見つかりません');
+                    this.showNotice('エラー: ファイル入力要素が見つかりません', 'error');
                     return;
                 }
+                fileInput.value = '';
                 console.log('Opening file dialog...');
                 fileInput.click();
             }
 
             saveFile() {
                 if (!this.parser || !this.assets.length) {
-                    alert('保存するファイルがありません');
+                    this.showNotice('保存するファイルがありません', 'warning');
                     return;
                 }
 
                 // エンディアン選択ダイアログを表示
                 const endianLittle = document.getElementById('endianLittle');
                 const endianBig = document.getElementById('endianBig');
+                const filenameInput = document.getElementById('saveFilenameInput');
+                const filename = this.currentFilename ? this.currentFilename.replace(/\.pck$/i, '') : 'output';
+                const defaultFilename = filename.endsWith('.pck') ? filename : filename + '.pck';
                 
                 // 現在の設定をデフォルトとして保持
                 if (this.parser.isLittleEndian) {
                     endianLittle.checked = true;
                 } else {
                     endianBig.checked = true;
+                }
+                if (filenameInput) {
+                    filenameInput.value = defaultFilename;
+                    window.setTimeout(() => {
+                        filenameInput.focus();
+                        filenameInput.select();
+                    }, 0);
                 }
                 
                 document.getElementById('saveDialogOverlay').style.display = 'flex';
@@ -2404,19 +2747,29 @@
             async confirmSave() {
                 try {
                     const isLittleEndian = document.getElementById('endianLittle').checked;
+                    const filenameInput = document.getElementById('saveFilenameInput');
                     
                     // デフォルトファイル名を生成
                     const filename = this.currentFilename ? this.currentFilename.replace(/\.pck$/i, '') : 'output';
                     const defaultFilename = filename.endsWith('.pck') ? filename : filename + '.pck';
-                    
-                    let finalFilename = defaultFilename;
+                    let finalFilename = filenameInput ? filenameInput.value.trim() : defaultFilename;
+                    if (!finalFilename) {
+                        this.showNotice('ファイル名を入力してください', 'warning');
+                        if (filenameInput) {
+                            filenameInput.focus();
+                        }
+                        return;
+                    }
+                    if (!finalFilename.endsWith('.pck')) {
+                        finalFilename += '.pck';
+                    }
                     let shouldDownload = false;
                     
                     // showSaveFilePicker が使用可能な場合（Chrome/Edge/Safari）
                     if (window.showSaveFilePicker) {
                         try {
                             const handle = await window.showSaveFilePicker({
-                                suggestedName: defaultFilename,
+                                suggestedName: finalFilename,
                                 types: [{
                                     description: 'PCK Files',
                                     accept: { 'application/octet-stream': ['.pck'] }
@@ -2429,23 +2782,15 @@
                             await writable.close();
                             
                             this.closeSaveDialog();
-                            alert(`ファイルを保存しました: ${handle.name}`);
+                            this.showNotice(`ファイルを保存しました: ${handle.name}`, 'success');
                             return;
                         } catch (err) {
                             if (err.name !== 'AbortError') {
-                                alert(`ファイルの保存に失敗しました: ${err.message}`);
+                                this.showNotice(`ファイルの保存に失敗しました: ${err.message}`, 'error', 4000);
                             }
                             return;
                         }
                     } else {
-                        // Firefox: プロンプトでファイル名を入力させる
-                        const userInput = prompt('ファイル名を入力してください:', defaultFilename);
-                        if (userInput === null) return; // キャンセルの場合
-                        
-                        finalFilename = userInput.trim() || defaultFilename;
-                        if (!finalFilename.endsWith('.pck')) {
-                            finalFilename += '.pck';
-                        }
                         shouldDownload = true;
                     }
                     
@@ -2476,12 +2821,28 @@
                         }, 100);
                     }
                 } catch (error) {
-                    alert(`保存に失敗しました: ${error.message}`);
+                    this.showNotice(`保存に失敗しました: ${error.message}`, 'error', 4000);
                 }
             }
 
             buildPckBuffer(isLittleEndian = null) {
                 const little = isLittleEndian !== null ? isLittleEndian : this.parser.isLittleEndian;
+                // --- 保存直前にネストPCKアセットのdataを最新childAssetsから再エンコード ---
+                this.assets.forEach(asset => {
+                    if ((asset.typeCode === 5 || asset.typeCode === 8 || asset.typeCode === 11) && asset.data) {
+                        // childAssetsを取得
+                        const childAssets = this.parsePckAsset(asset);
+                        if (childAssets && childAssets.length > 0) {
+                            // オリジナルPCKタイプとエンディアンを推定
+                            const originalPckType = asset.typeCode === 5 ? 3 : (asset.typeCode === 8 ? 4 : 5);
+                            const originalLittleEndian = this.parser ? this.parser.littleEndian : false;
+                            const updatedPckBuffer = this.encodePck(childAssets, originalPckType, originalLittleEndian);
+                            asset.data = new Uint8Array(updatedPckBuffer);
+                            asset.dataSize = updatedPckBuffer.byteLength;
+                        }
+                    }
+                });
+
                 const buffer = new ArrayBuffer(1024 * 1024 * 10);
                 const view = new DataView(buffer);
                 const writer = {
@@ -2572,10 +2933,10 @@
                 return buffer.slice(0, writer.offset);
             }
 
-            closeFile() {
+            async closeFile() {
                 if (!this.parser) return;
                 
-                if (confirm('ファイルを閉じますか？')) {
+                if (await this.showConfirm('ファイルを閉じますか？', { title: 'ファイルを閉じる' })) {
                     this.parser = null;
                     this.assets = [];
                     this.selectedAsset = null;
@@ -2615,7 +2976,7 @@
                 if (!file) return;
 
                 if (!file.name.toLowerCase().endsWith('.pck')) {
-                    alert('.pck ファイルを選択してください');
+                    this.showNotice('.pck ファイルを選択してください', 'warning');
                     return;
                 }
 
@@ -2626,7 +2987,7 @@
                     this.parsePckFile(e.target.result);
                 };
                 reader.onerror = () => {
-                    alert('ファイル読み込みエラー');
+                    this.showNotice('ファイル読み込みエラー', 'error');
                 };
                 reader.readAsArrayBuffer(file);
             }
@@ -2932,7 +3293,7 @@
             }
 
             renderTree(parentElement, tree, parentNode, currentPath, currentPckFolder = null) {
-                Object.keys(tree).sort().forEach(key => {
+                Object.keys(tree).forEach(key => {
                     const node = tree[key];
                     // PCK内のフォルダで _fullPath がある場合はそれを使用、そうでない場合は currentPath を累積
                     let nodePath;
@@ -3087,8 +3448,9 @@
             }
 
             selectAsset(asset, element, index) {
-                this.selectedAsset = asset;
-                this.selectedAssetIndex = index;
+            this.selectedAsset = asset;
+            this.selectedAssetIndex = index;
+            this.currentAsset = asset; // 3Dプレビュー用にcurrentAssetも必ずセット
 
                 // モバイルでサイドバーを閉じる
                 if (window.innerWidth <= 768) {
@@ -3105,8 +3467,11 @@
             }
 
             displayPreview(asset) {
+                                // 3Dプレビュー用にcurrentAssetも必ずセット
+                                this.currentAsset = asset;
                 const header = document.getElementById('previewHeader');
                 const content = document.getElementById('previewContent');
+                this.stopSkin3DAnimation('asset');
 
                 let indexText = '';
                 if (this.selectedAssetIndex !== undefined) {
@@ -3117,7 +3482,29 @@
                         indexText = `[${foundIndex}] `;
                     }
                 }
-                header.textContent = `プレビュー - ${indexText}${asset.filename}`;
+                const isImageAsset = /\.(png|jpg|jpeg|gif|bmp)$/i.test(asset.filename);
+                const showSkinControls = isImageAsset && this.isSkinAsset(asset);
+                header.innerHTML = `プレビュー - ${indexText}${asset.filename}` +
+                    (showSkinControls
+                        ? `<span style="margin-left:16px;font-size:12px;">
+                            <label><input type="checkbox" id="firstLayerToggle" ${this.showFirstLayer ? 'checked' : ''} style="vertical-align:middle;">ファーストレイヤー</label>
+                            <label style="margin-left:8px;"><input type="checkbox" id="secondLayerToggle" ${this.showSecondLayer ? 'checked' : ''} style="vertical-align:middle;">セカンドレイヤー</label>
+                            <label style="margin-left:8px;"><input type="checkbox" id="capeLayerToggle" ${this.showCapeLayer ? 'checked' : ''} style="vertical-align:middle;">マント</label>
+                            <label style="margin-left:8px;"><input type="checkbox" id="customBoxToggle" ${this.showCustomBoxes ? 'checked' : ''} style="vertical-align:middle;">追加BOX</label>
+                        </span>`
+                        : '');
+                if (showSkinControls) {
+                    setTimeout(() => {
+                        const first = document.getElementById('firstLayerToggle');
+                        const second = document.getElementById('secondLayerToggle');
+                        const cape = document.getElementById('capeLayerToggle');
+                        const customBox = document.getElementById('customBoxToggle');
+                        if (first) first.onchange = (e) => { this.showFirstLayer = e.target.checked; this.displayPreview(asset); };
+                        if (second) second.onchange = (e) => { this.showSecondLayer = e.target.checked; this.displayPreview(asset); };
+                        if (cape) cape.onchange = (e) => { this.showCapeLayer = e.target.checked; this.displayPreview(asset); };
+                        if (customBox) customBox.onchange = (e) => { this.showCustomBoxes = e.target.checked; this.displayPreview(asset); };
+                    }, 0);
+                }
 
                 if (asset.dataSize === 0) {
                     content.innerHTML = '<div class="empty-message"><div class="empty-icon">📭</div>データなし</div>';
@@ -3284,7 +3671,7 @@
                 // UIを再描画
                 this.selectLocKey(this.selectedLocKey);
                 
-                alert(`「${this.selectedLocKey}」をすべての言語に適用しました`);
+                this.showNotice(`「${this.selectedLocKey}」をすべての言語に適用しました`, 'success');
             }
 
             rebuildLocBuffer() {
@@ -3310,7 +3697,7 @@
                     document.getElementById('menuSave').style.pointerEvents = 'auto';
                 } catch (error) {
                     console.error('LOC更新エラー:', error);
-                    alert(`LOCの更新に失敗しました: ${error.message}`);
+                    this.showNotice(`LOCの更新に失敗しました: ${error.message}`, 'error', 4000);
                 }
             }
 
@@ -3319,12 +3706,23 @@
                     const imageData = asset.data || new Uint8Array(this.parser.buffer, asset.dataOffset, asset.dataSize);
                     
                     // Blob URL の代わりに Data URL を使用（URLの有効期限問題を避ける）
-                    const base64 = btoa(String.fromCharCode.apply(null, imageData));
-                    const dataUrl = 'data:image/png;base64,' + base64;
+                    const dataUrl = this.createDataUrlFromBytes(imageData);
 
                     // 画像を読み込んでサイズを確認
                     const img = new Image();
-                    img.onload = () => {
+                    img.onload = async () => {
+                        if (this.isSkinAsset(asset, img)) {
+                            const animInfo = this.getSkinModelForAsset(asset);
+                            const capePreview = await this.loadCapePreviewForSkin(asset);
+                            this.renderSkinDualPreview(container, dataUrl, img, animInfo, 'asset', capePreview);
+                            return;
+                        }
+
+                        if (this.isCapeAsset(asset, img)) {
+                            this.renderCapeDualPreview(container, dataUrl, img, 'asset');
+                            return;
+                        }
+
                         // 小さい画像は自動拡大（64x64のスキンなど）
                         let displayWidth = img.width;
                         let displayHeight = img.height;
@@ -3357,6 +3755,1124 @@
                 } catch (error) {
                     container.innerHTML = '<div class="empty-message"><div class="empty-icon">🖼️</div>画像の表示に失敗しました</div>';
                 }
+            }
+
+            isSkinAsset(asset, img = null) {
+                if (asset.typeCode === 0) return true;
+                const filename = asset.filename.toLowerCase();
+                if (filename.includes('dlcskin') || filename.includes('/skin') || filename.startsWith('skin')) {
+                    if (!img) return true;
+                    return img.width === 64 && (img.height === 64 || img.height === 32);
+                }
+                return false;
+            }
+
+            isCapeAsset(asset, img = null) {
+                if (asset.typeCode === 1) return true;
+                const filename = asset.filename.toLowerCase();
+                if (filename.includes('cape') || filename.includes('elytra')) {
+                    if (!img) return true;
+                    return img.width >= 64 && img.height >= 32;
+                }
+                return false;
+            }
+
+            getSkinModelFromAnim(animValue) {
+                return this.getSkinAnimInfoFromAnim(animValue).modelType;
+            }
+
+            getSkinModelForAsset(asset) {
+                const animValue = asset.properties?.find(p => p.key === 'ANIM')?.value;
+                return this.getSkinAnimInfoFromAnim(animValue);
+            }
+
+            normalizeAssetPath(path) {
+                return String(path || '').replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase();
+            }
+
+            getAssetDirectory(path) {
+                const normalized = String(path || '').replace(/\\/g, '/');
+                const lastSlash = normalized.lastIndexOf('/');
+                return lastSlash === -1 ? '' : normalized.slice(0, lastSlash);
+            }
+
+            getAssetBytes(asset) {
+                if (!asset) return null;
+                if (asset.data && asset.data.byteLength > 0) {
+                    return new Uint8Array(asset.data.buffer.slice(asset.data.byteOffset, asset.data.byteOffset + asset.data.byteLength));
+                }
+                if (this.parser && asset.dataSize > 0) {
+                    return new Uint8Array(this.parser.buffer, asset.dataOffset, asset.dataSize);
+                }
+                return null;
+            }
+
+            createDataUrlFromBytes(bytes) {
+                const base64 = btoa(String.fromCharCode.apply(null, bytes));
+                return 'data:image/png;base64,' + base64;
+            }
+
+            findAssetByPathAnywhere(path, assets = this.assets) {
+                const target = this.normalizeAssetPath(path);
+                if (!target) return null;
+
+                for (const candidate of assets) {
+                    if (this.normalizeAssetPath(candidate.filename) === target) {
+                        return candidate;
+                    }
+                    if (this.isPckFile(candidate)) {
+                        const childAssets = this.parsePckAsset(candidate);
+                        if (childAssets && childAssets.length > 0) {
+                            const found = this.findAssetByPathAnywhere(path, childAssets);
+                            if (found) return found;
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            resolveCapeAssetForSkin(asset) {
+                const capePath = asset?.properties?.find(p => p.key === 'CAPEPATH')?.value;
+                if (!capePath) return null;
+
+                const normalizedCapePath = String(capePath).replace(/\\/g, '/');
+                const assetDir = this.getAssetDirectory(asset.filename);
+                const candidates = [normalizedCapePath];
+
+                if (assetDir && !normalizedCapePath.includes('/')) {
+                    candidates.push(assetDir + '/' + normalizedCapePath);
+                }
+
+                for (const candidatePath of candidates) {
+                    const found = this.findAssetByPathAnywhere(candidatePath);
+                    if (found) return found;
+                }
+
+                const capeBasename = normalizedCapePath.split('/').pop();
+                if (!capeBasename) return null;
+
+                const basenameMatches = [];
+                const collectMatches = (searchAssets) => {
+                    for (const candidate of searchAssets) {
+                        const candidatePath = this.normalizeAssetPath(candidate.filename);
+                        const basename = this.normalizeAssetPath(capeBasename);
+                        if (candidatePath === basename || candidatePath.endsWith('/' + basename)) {
+                            basenameMatches.push(candidate);
+                        }
+                        if (this.isPckFile(candidate)) {
+                            const childAssets = this.parsePckAsset(candidate);
+                            if (childAssets && childAssets.length > 0) {
+                                collectMatches(childAssets);
+                            }
+                        }
+                    }
+                };
+
+                collectMatches(this.assets);
+                return basenameMatches.length === 1 ? basenameMatches[0] : null;
+            }
+
+            loadImageFromAsset(asset) {
+                return new Promise((resolve) => {
+                    const bytes = this.getAssetBytes(asset);
+                    if (!bytes || bytes.byteLength === 0) {
+                        resolve(null);
+                        return;
+                    }
+
+                    const dataUrl = this.createDataUrlFromBytes(bytes);
+                    const image = new Image();
+                    image.onload = () => resolve({ image, dataUrl });
+                    image.onerror = () => resolve(null);
+                    image.src = dataUrl;
+                });
+            }
+
+            async loadCapePreviewForSkin(asset) {
+                const capeAsset = this.resolveCapeAssetForSkin(asset);
+                if (!capeAsset) return null;
+                return this.loadImageFromAsset(capeAsset);
+            }
+
+            parseAnimValue(animValue) {
+                if (animValue === undefined || animValue === null) return 0;
+                const text = String(animValue).trim().toLowerCase();
+                if (text.startsWith('0x')) {
+                    const parsedHex = parseInt(text, 16);
+                    return Number.isNaN(parsedHex) ? 0 : (parsedHex >>> 0);
+                }
+                const parsed = parseInt(text, 10);
+                return Number.isNaN(parsed) ? 0 : (parsed >>> 0);
+            }
+
+            getSkinAnimInfoFromAnim(animValue) {
+                const rawValue = this.parseAnimValue(animValue);
+
+                const FLAGS = {
+                    HEAD_DISABLED: 1 << 10,
+                    RIGHT_ARM_DISABLED: 1 << 11,
+                    LEFT_ARM_DISABLED: 1 << 12,
+                    BODY_DISABLED: 1 << 13,
+                    RIGHT_LEG_DISABLED: 1 << 14,
+                    LEFT_LEG_DISABLED: 1 << 15,
+                    HEAD_OVERLAY_DISABLED: 1 << 16,
+                    RESOLUTION_64x64: 1 << 18,
+                    SLIM_MODEL: 1 << 19,
+                    LEFT_ARM_OVERLAY_DISABLED: 1 << 20,
+                    RIGHT_ARM_OVERLAY_DISABLED: 1 << 21,
+                    LEFT_LEG_OVERLAY_DISABLED: 1 << 22,
+                    RIGHT_LEG_OVERLAY_DISABLED: 1 << 23,
+                    BODY_OVERLAY_DISABLED: 1 << 24
+                };
+
+                const hasFlag = (mask) => (rawValue & mask) !== 0;
+                const isSlim = hasFlag(FLAGS.SLIM_MODEL);
+                const isClassic64 = hasFlag(FLAGS.RESOLUTION_64x64);
+
+                let modelType = 'other';
+                let modelLabel = 'Other';
+                if (isSlim) {
+                    modelType = 'alex';
+                    modelLabel = 'Alex';
+                } else if (isClassic64) {
+                    modelType = 'steve';
+                    modelLabel = 'Steve';
+                }
+
+                return {
+                    rawValue,
+                    modelType,
+                    modelLabel,
+                    flags: {
+                        headDisabled: hasFlag(FLAGS.HEAD_DISABLED),
+                        bodyDisabled: hasFlag(FLAGS.BODY_DISABLED),
+                        leftArmDisabled: hasFlag(FLAGS.LEFT_ARM_DISABLED),
+                        rightArmDisabled: hasFlag(FLAGS.RIGHT_ARM_DISABLED),
+                        leftLegDisabled: hasFlag(FLAGS.LEFT_LEG_DISABLED),
+                        rightLegDisabled: hasFlag(FLAGS.RIGHT_LEG_DISABLED),
+                        headOverlayDisabled: hasFlag(FLAGS.HEAD_OVERLAY_DISABLED),
+                        bodyOverlayDisabled: hasFlag(FLAGS.BODY_OVERLAY_DISABLED),
+                        leftArmOverlayDisabled: hasFlag(FLAGS.LEFT_ARM_OVERLAY_DISABLED),
+                        rightArmOverlayDisabled: hasFlag(FLAGS.RIGHT_ARM_OVERLAY_DISABLED),
+                        leftLegOverlayDisabled: hasFlag(FLAGS.LEFT_LEG_OVERLAY_DISABLED),
+                        rightLegOverlayDisabled: hasFlag(FLAGS.RIGHT_LEG_OVERLAY_DISABLED)
+                    }
+                };
+            }
+
+            buildAnimInfoForModel(modelType) {
+                return {
+                    rawValue: modelType === 'alex' ? 0x00080000 : 0x00040000,
+                    modelType,
+                    modelLabel: modelType === 'alex' ? 'Alex' : 'Steve',
+                    flags: {
+                        headDisabled: false,
+                        bodyDisabled: false,
+                        leftArmDisabled: false,
+                        rightArmDisabled: false,
+                        leftLegDisabled: false,
+                        rightLegDisabled: false,
+                        headOverlayDisabled: false,
+                        bodyOverlayDisabled: false,
+                        leftArmOverlayDisabled: false,
+                        rightArmOverlayDisabled: false,
+                        leftLegOverlayDisabled: false,
+                        rightLegOverlayDisabled: false
+                    }
+                };
+            }
+
+            renderSkinDualPreview(container, dataUrl, img, animInfo, target = 'asset', capePreview = null) {
+                const canvasId = target === 'import' ? 'importSkin3dCanvas' : 'assetSkin3dCanvas';
+                const modelLabel = animInfo?.modelLabel || 'Other';
+
+                container.innerHTML = `
+                    <div class="skin-dual-preview">
+                        <div class="skin-preview-panel">
+                            <div class="skin-preview-panel-title">展開図</div>
+                            <div class="skin-layout-wrap">
+                                <img src="${dataUrl}" class="skin-layout-image" alt="Skin Layout" />
+                            </div>
+                        </div>
+                        <div class="skin-preview-panel">
+                            <div class="skin-preview-panel-title">3D プレビュー</div>
+                            <div class="skin-3d-wrap">
+                                <canvas id="${canvasId}" class="skin-3d-canvas"></canvas>
+                                <div class="skin-3d-model-label">${modelLabel} Model</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="color: #858585; font-size: 11px; margin-top: 4px;">
+                        元サイズ: ${img.width} × ${img.height} px
+                        ${capePreview?.image ? ` • マント: ${capePreview.image.width} × ${capePreview.image.height} px` : ''}
+                    </div>
+                `;
+
+                const canvas = document.getElementById(canvasId);
+                this.startSkin3DAnimation(canvas, img, animInfo, target, capePreview?.image || null, 'skin');
+            }
+
+            renderCapeDualPreview(container, dataUrl, img, target = 'asset') {
+                const canvasId = target === 'import' ? 'importSkin3dCanvas' : 'assetSkin3dCanvas';
+
+                container.innerHTML = `
+                    <div class="skin-dual-preview">
+                        <div class="skin-preview-panel">
+                            <div class="skin-preview-panel-title">展開図</div>
+                            <div class="skin-layout-wrap">
+                                <img src="${dataUrl}" class="skin-layout-image" alt="Cape Layout" />
+                            </div>
+                        </div>
+                        <div class="skin-preview-panel">
+                            <div class="skin-preview-panel-title">3D プレビュー</div>
+                            <div class="skin-3d-wrap">
+                                <canvas id="${canvasId}" class="skin-3d-canvas"></canvas>
+                                <div class="skin-3d-model-label">Cape</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="color: #858585; font-size: 11px; margin-top: 4px;">
+                        元サイズ: ${img.width} × ${img.height} px
+                    </div>
+                `;
+
+                const canvas = document.getElementById(canvasId);
+                this.startSkin3DAnimation(canvas, img, null, target, img, 'cape');
+            }
+
+            stopSkin3DAnimation(target = 'asset') {
+                if (target === 'import') {
+                    if (this.importSkin3dCleanup) {
+                        this.importSkin3dCleanup();
+                        this.importSkin3dCleanup = null;
+                    }
+                    if (this.importSkin3dFrame) {
+                        cancelAnimationFrame(this.importSkin3dFrame);
+                        this.importSkin3dFrame = null;
+                    }
+                    return;
+                }
+
+                if (this.assetSkin3dCleanup) {
+                    this.assetSkin3dCleanup();
+                    this.assetSkin3dCleanup = null;
+                }
+                if (this.assetSkin3dFrame) {
+                    cancelAnimationFrame(this.assetSkin3dFrame);
+                    this.assetSkin3dFrame = null;
+                }
+            }
+
+            startSkin3DAnimation(canvas, img, animInfo, target = 'asset', capeImg = null, previewMode = 'skin') {
+                // カメラ状態をクラスプロパティとして保持
+                if (this.angleY === undefined) this.angleY = -0.65;
+                if (this.angleX === undefined) this.angleX = -0.26;
+                if (this.zoom === undefined) this.zoom = 3.9;
+                if (this.focusY === undefined) this.focusY = 14;
+
+                // UV座標変換関数をグローバルに定義
+                function toUvRect(x, y, w, h) {
+                    // UVスケールを常に64x64基準（scaleX=1, scaleY=1）で固定
+                    return [
+                        Math.max(0, Math.round(x)),
+                        Math.max(0, Math.round(y)),
+                        Math.max(1, Math.round(w)),
+                        Math.max(1, Math.round(h))
+                    ];
+                }
+                // 3Dモデルパーツ格納配列（BOXや標準パーツをここに追加）
+                let parts = [];
+                // --- BOXプロパティ対応: スキンの追加BOXをパースしてpartsに追加 ---
+                // asset情報を取得（targetで判別）
+                let asset = null;
+                if (target === 'asset' && this.currentAsset) asset = this.currentAsset;
+                if (target === 'import' && this.importAsset) asset = this.importAsset;
+                if (!asset) {
+                    console.error('[ERROR] 3Dプレビュー用のassetがnullです。currentAsset/importAssetがセットされていません。ファイル読み込み処理・アセット選択処理を見直してください。');
+                }
+
+                // BOXプロパティを探す
+                let boxProps = [];
+                let offsetMap = {};
+                if (asset && asset.properties) {
+                    boxProps = asset.properties.filter(p => p.key === 'BOX');
+                    // OFFSETプロパティを全て収集
+                    asset.properties.filter(p => p.key === 'OFFSET').forEach(p => {
+                        // 例: "ARM0 Y 2" → offsetMap[ARM0] = {Y:2}
+                        const tokens = String(p.value).trim().split(/\s+/);
+                        if (tokens.length >= 3) {
+                            const part = tokens[0];
+                            const axis = tokens[1].toUpperCase();
+                            const val = parseFloat(tokens[2]);
+                            if (!offsetMap[part]) offsetMap[part] = {};
+                            offsetMap[part][axis] = val;
+                        }
+                    });
+                }
+                console.log('[DEBUG] asset:', asset);
+                console.log('[DEBUG] boxProps:', boxProps);
+                console.log('[DEBUG] offsetMap:', offsetMap);
+
+                // --- UVスケール値を先に定義 ---
+                const textureWidth = img.width;
+                const textureHeight = img.height;
+                const isLegacySkin = textureHeight * 2 === textureWidth;
+                const baseTextureHeight = isLegacySkin ? 32 : 64;
+                const scaleX = textureWidth / 64;
+                const scaleY = textureHeight / baseTextureHeight;
+
+                // parts生成・BOXパースは元のまま...
+                function parseBoxText(boxText) {
+                    console.log('[DEBUG] parseBoxText input:', boxText);
+                    const tokens = boxText.trim().split(/\s+/);
+                    const name = tokens[0];
+                    const px = parseFloat(tokens[1]);
+                    const py = parseFloat(tokens[2]);
+                    const pz = parseFloat(tokens[3]);
+                    const sx = parseFloat(tokens[4]);
+                    const sy = parseFloat(tokens[5]);
+                    const sz = parseFloat(tokens[6]);
+                    const u = parseFloat(tokens[7]);
+                    const v = tokens.length > 8 ? parseFloat(tokens[8]) : 0;
+                    const inflate = tokens.length > 9 ? parseFloat(tokens[9]) : 0;
+                    const mirrorVal = tokens.length > 10 ? (tokens[10] === '1' || tokens[10] === 'true') : false;
+
+                    // ...toUvRectは外側で定義...
+
+                    // HEADパーツの展開図と同じUV配置
+                    // top:    [u+sx, v, sz, sx]
+                    // bottom: [u+sx+sz, v, sz, sx]
+                    // left:   [u+sx+sz, v+sz, sx, sz]
+                    // front:  [u+sz, v+sz, sx, sz]
+                    // right:  [u, v+sz, sx, sz]
+                    // back:   [u+sx+sz+sx, v+sz, sx, sz]
+                    // HEAD展開図の一般式（sx,sy,sz,u,vを使う）
+                    const uvMap = {
+                        top:    toUvRect(u+sz, v, sx, sz),
+                        bottom: toUvRect(u+sz+sx, v, sx, sz),
+                        left:   toUvRect(u+sz+sx, v+sz, sz, sy),
+                        front:  toUvRect(u+sz, v+sz, sx, sy),
+                        right:  toUvRect(u, v+sz, sz, sy),
+                        back:   toUvRect(u+sz+sx+sz, v+sz, sx, sy)
+                    };
+                    // uvTransform初期化
+                    let uvTransform = {};
+                    if (mirrorVal) {
+                        // C# の MirrorTexture は UV 領域の入れ替えではなく、
+                        // 各面の U 方向だけを通常時と逆向きにする。
+                        const swappedLeft = uvMap.right;
+                        uvMap.right = uvMap.left;
+                        uvMap.left = swappedLeft;
+                        uvTransform.front = { flipX: false };
+                        uvTransform.back = { flipX: false };
+                        uvTransform.top = { flipX: false };
+                        uvTransform.bottom = { flipX: false, flipY: true };
+                        uvTransform.left = { flipX: false };
+                        uvTransform.right = { flipX: false };
+                    }
+                    // デバッグ: パースしたBOX＋オフセット内容を一度だけ出力
+                    setTimeout(() => {
+                        if (name && name.toLowerCase().startsWith('box') || name === 'HEAD') {
+                            console.log('[BOX PARSE]', {
+                                name, px, py, pz, sx, sy, sz, u, v, inflate, mirrorVal,
+                                offset: offsetMap[name] || null
+                            });
+                        }
+                    }, 0);
+                    // id生成
+                    const torsoParts = ['HEAD', 'BODY', 'HEADWEAR', 'JACKET', 'WAIST', 'BELT', 'BODYARMOR', 'BODYARMOR0', 'BODYARMOR1'];
+                    const rightArmParts = ['ARM0', 'SLEEVE0', 'ARMARMOR0'];
+                    const leftArmParts = ['ARM1', 'SLEEVE1', 'ARMARMOR1'];
+                    const rightLegParts = ['LEG0', 'PANTS0', 'LEGGING0', 'SOCK0', 'BOOT0'];
+                    const leftLegParts = ['LEG1', 'PANTS1', 'LEGGING1', 'SOCK1', 'BOOT1'];
+                    const knownPartNames = [...torsoParts, ...rightArmParts, ...leftArmParts, ...rightLegParts, ...leftLegParts];
+
+                    let idName = name;
+                    if (!knownPartNames.includes(name)) {
+                        idName = name || 'custom';
+                    }
+                    // ...existing code...
+                    // 座標初期値
+                    let xVal = px;
+                    let yVal = py;
+                    let zVal = pz;
+                    // 標準パーツ名ごとに座標補正
+                    if (torsoParts.includes(name)) {
+                        xVal = -px;
+                        yVal = -py + 20;
+                        zVal = -pz;
+                    } else if (rightArmParts.includes(name)) {
+                        xVal = -px + 5;
+                        yVal = -py + 18;
+                        zVal = -pz;
+                    } else if (leftArmParts.includes(name)) {
+                        xVal = -px - 5;
+                        yVal = -py + 18;
+                        zVal = -pz;
+                    } else if (rightLegParts.includes(name)) {
+                        xVal = -px + 2;
+                        yVal = -py + 8;
+                        zVal = -pz;
+                    } else if (leftLegParts.includes(name)) {
+                        xVal = -px - 2;
+                        yVal = -py + 8;
+                        zVal = -pz;
+                    }
+                    // オフセット適用
+                    if (offsetMap[name]) {
+                        if (offsetMap[name]['X']) xVal -= offsetMap[name]['X'];
+                        if (offsetMap[name]['Y']) yVal -= offsetMap[name]['Y'];
+                        if (offsetMap[name]['Z']) zVal -= offsetMap[name]['Z'];
+                    }
+                    xVal -= sx/2;
+                    yVal -= sy/2;
+                    zVal -= sz/2;
+                    // セカンドレイヤー該当パーツは常にouterExpand=0.125
+                    const secondLayerNames = ['HEADWEAR','JACKET','SLEEVE0','SLEEVE1','PANTS0','PANTS1','WAIST','LEGGING0','LEGGING1','SOCK0','SOCK1','BOOT0','BOOT1','ARMARMOR0','ARMARMOR1','BODYARMOR','BODYARMOR0','BODYARMOR1','BELT'];
+                    return {
+                        id: `box_${idName}`,
+                        x: xVal,
+                        y: yVal,
+                        z: zVal,
+                        w: sx,
+                        h: sy,
+                        d: sz,
+                        uv: uvMap,
+                        uvTransform: { bottom: { flipY: true }, ...uvTransform },
+                        outerUv: secondLayerNames.includes(idName) ? uvMap : null,
+                        outerExpand: secondLayerNames.includes(idName) ? 0.125 : (inflate || 0),
+                        disableKey: null,
+                        overlayDisableKey: null,
+                        mirror: !!mirrorVal
+                    };
+                }
+
+                // parts配列にBOXを追加
+                if (boxProps.length > 0) {
+                    boxProps.forEach(prop => {
+                        // 複数行BOX対応
+                        const lines = String(prop.value).split(/\r?\n/);
+                        console.log('[DEBUG] BOX lines:', lines);
+                        lines.forEach(line => {
+                            if (!line.trim()) return;
+                            const boxPart = parseBoxText(line);
+                            console.log('[DEBUG] boxPart:', boxPart);
+                            if (boxPart) {
+                                // inflate値をBOXパーツにも反映（サイズ膨張）
+                                if (boxPart.outerExpand && boxPart.outerExpand !== 0) {
+                                    // inflateによる拡張処理を元に戻す（何もしない）
+                                }
+                                parts.push(boxPart);
+                                console.log('[DEBUG] parts after push:', parts);
+                            }
+                        });
+                    });
+                }
+
+                // --- ここで標準パーツを追加 ---
+
+                // デバッグ: parts配列の内容を全出力（スケールズレ可視化用）
+                console.log('[DEBUG] parts array:');
+                parts.forEach(p => {
+                    console.log('[PART]', {
+                        id: p.id,
+                        w: p.w, h: p.h, d: p.d,
+                        x: p.x, y: p.y, z: p.z,
+                        uv: p.uv
+                    });
+                });
+
+
+                this.stopSkin3DAnimation(target);
+
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                const armWidth = animInfo?.modelType === 'alex' ? 3 : 4;
+
+                // toUvRectはここで再定義せずparseBoxText内のものを使う
+
+                const toUvMap = (faceMap) => {
+                    const result = {};
+                    Object.entries(faceMap).forEach(([key, rect]) => {
+                        result[key] = toUvRect(rect[0], rect[1], rect[2], rect[3]);
+                    });
+                    return result;
+                };
+
+                const rightArmBaseUv = {
+                    top: [44, 16, armWidth, 4],
+                    bottom: [44 + armWidth, 16, armWidth, 4],
+                    left: [44 + armWidth, 20, 4, 12],
+                    front: [44, 20, armWidth, 12],
+                    right: [44 - armWidth, 20, 4, 12],
+                    back: [44 + armWidth + 4, 20, armWidth, 12]
+                };
+
+                const leftArmBaseUv = isLegacySkin ? rightArmBaseUv : {
+                    top: [36, 48, armWidth, 4],
+                    bottom: [36 + armWidth, 48, armWidth, 4],
+                    left: [36 + armWidth, 52, 4, 12],
+                    front: [36, 52, armWidth, 12],
+                    right: [36 - armWidth, 52, 4, 12],
+                    back: [36 + armWidth + 4, 52, armWidth, 12]
+                };
+
+                const rightLegBaseUv = {
+                    top: [4, 16, 4, 4],
+                    bottom: [8, 16, 4, 4],
+                    left: [8, 20, 4, 12],
+                    front: [4, 20, 4, 12],
+                    right: [0, 20, 4, 12],
+                    back: [12, 20, 4, 12]
+                };
+
+                const leftLegBaseUv = isLegacySkin ? rightLegBaseUv : {
+                    top: [20, 48, 4, 4],
+                    bottom: [24, 48, 4, 4],
+                    left: [24, 52, 4, 12],
+                    front: [20, 52, 4, 12],
+                    right: [16, 52, 4, 12],
+                    back: [28, 52, 4, 12]
+                };
+
+                // 標準パーツ座標にもOFFSETを適用
+                const applyOffset = (id, x, y, z) => {
+                    // 標準レイヤー名・セカンドレイヤー名両方対応
+                    const nameMap = {
+                        head: 'HEAD', body: 'BODY', rightArm: 'ARM0', leftArm: 'ARM1', rightLeg: 'LEG0', leftLeg: 'LEG1',
+                        jacket: 'JACKET', headwear: 'HEADWEAR', sleeve0: 'SLEEVE0', sleeve1: 'SLEEVE1', pants0: 'PANTS0', pants1: 'PANTS1'
+                    };
+                    const name = nameMap[id] || id;
+                    let ox = x, oy = y, oz = z;
+                    if (offsetMap[name]) {
+                        if (offsetMap[name]['X']) ox -= offsetMap[name]['X'];
+                        if (offsetMap[name]['Y']) oy -= offsetMap[name]['Y'];
+                        if (offsetMap[name]['Z']) oz -= offsetMap[name]['Z'];
+                    }
+                    return [ox, oy, oz];
+                };
+                parts = parts.concat([
+                    (() => { let [x, y, z] = applyOffset('head', 0, 24, 0); return {
+                        id: 'head', disableKey: 'headDisabled', overlayDisableKey: 'headOverlayDisabled',
+                        x, y, z, w: 8, h: 8, d: 8,
+                        uv: toUvMap({
+                            top: [8, 0, 8, 8], bottom: [16, 0, 8, 8], left: [16, 8, 8, 8], front: [8, 8, 8, 8], right: [0, 8, 8, 8], back: [24, 8, 8, 8]
+                        }),
+                        uvTransform: { bottom: { flipY: true } },
+                        outerUv: toUvMap({
+                            top: [40, 0, 8, 8], bottom: [48, 0, 8, 8], left: [48, 8, 8, 8], front: [40, 8, 8, 8], right: [32, 8, 8, 8], back: [56, 8, 8, 8]
+                        }),
+                        outerUvTransform: { bottom: { flipY: true } }, outerExpand: 0.125
+                    }; })(),
+                    (() => { let [x, y, z] = applyOffset('body', 0, 14, 0); return {
+                        id: 'body', disableKey: 'bodyDisabled', overlayDisableKey: 'bodyOverlayDisabled',
+                        x, y, z, w: 8, h: 12, d: 4,
+                        uv: toUvMap({
+                            top: [20, 16, 8, 4], bottom: [28, 16, 8, 4], left: [28, 20, 4, 12], front: [20, 20, 8, 12], right: [16, 20, 4, 12], back: [32, 20, 8, 12]
+                        }),
+                        outerUv: isLegacySkin ? null : toUvMap({
+                            top: [20, 32, 8, 4], bottom: [28, 32, 8, 4], left: [28, 36, 4, 12], front: [20, 36, 8, 12], right: [16, 36, 4, 12], back: [32, 36, 8, 12]
+                        }),
+                        outerExpand: 0.125
+                    }; })(),
+                    (() => { let [x, y, z] = applyOffset('rightArm', 4 + armWidth / 2, 14, 0); return {
+                        id: 'rightArm', disableKey: 'rightArmDisabled', overlayDisableKey: 'rightArmOverlayDisabled',
+                        x, y, z, w: armWidth, h: 12, d: 4,
+                        uv: toUvMap(rightArmBaseUv),
+                        outerUv: isLegacySkin ? null : toUvMap({
+                            top: [44, 32, armWidth, 4], bottom: [44 + armWidth, 32, armWidth, 4], left: [44 + armWidth, 36, 4, 12], front: [44, 36, armWidth, 12], right: [44 - armWidth, 36, 4, 12], back: [44 + armWidth + 4, 36, armWidth, 12]
+                        }),
+                        outerExpand: 0.125
+                    }; })(),
+                    (() => { let [x, y, z] = applyOffset('leftArm', -(4 + armWidth / 2), 14, 0); return {
+                        id: 'leftArm', disableKey: 'leftArmDisabled', overlayDisableKey: 'leftArmOverlayDisabled',
+                        x, y, z, w: armWidth, h: 12, d: 4,
+                        uv: toUvMap(leftArmBaseUv),
+                        outerUv: isLegacySkin ? null : toUvMap({
+                            top: [52, 48, armWidth, 4], bottom: [52 + armWidth, 48, armWidth, 4], left: [52 + armWidth, 52, 4, 12], front: [52, 52, armWidth, 12], right: [52 - armWidth, 52, 4, 12], back: [52 + armWidth + 4, 52, armWidth, 12]
+                        }),
+                        outerExpand: 0.125
+                    }; })(),
+                    (() => { let [x, y, z] = applyOffset('rightLeg', 2, 2, 0); return {
+                        id: 'rightLeg', disableKey: 'rightLegDisabled', overlayDisableKey: 'rightLegOverlayDisabled',
+                        x, y, z, w: 4, h: 12, d: 4,
+                        uv: toUvMap(rightLegBaseUv),
+                        outerUv: isLegacySkin ? null : toUvMap({
+                            top: [4, 32, 4, 4], bottom: [8, 32, 4, 4], left: [8, 36, 4, 12], front: [4, 36, 4, 12], right: [0, 36, 4, 12], back: [12, 36, 4, 12]
+                        }),
+                        outerExpand: 0.125
+                    }; })(),
+                    (() => { let [x, y, z] = applyOffset('leftLeg', -2, 2, 0); return {
+                        id: 'leftLeg', disableKey: 'leftLegDisabled', overlayDisableKey: 'leftLegOverlayDisabled',
+                        x, y, z, w: 4, h: 12, d: 4,
+                        uv: toUvMap(leftLegBaseUv),
+                        outerUv: isLegacySkin ? null : toUvMap({
+                            top: [4, 48, 4, 4], bottom: [8, 48, 4, 4], left: [8, 52, 4, 12], front: [4, 52, 4, 12], right: [0, 52, 4, 12], back: [12, 52, 4, 12]
+                        }),
+                        outerExpand: 0.125
+                    }; })()
+                ]);
+
+                const texCanvas = document.createElement('canvas');
+                texCanvas.width = textureWidth;
+                texCanvas.height = textureHeight;
+                const texCtx = texCanvas.getContext('2d', { willReadFrequently: true });
+                if (!texCtx) return;
+                texCtx.imageSmoothingEnabled = false;
+                texCtx.drawImage(img, 0, 0);
+                const textureData = texCtx.getImageData(0, 0, textureWidth, textureHeight).data;
+
+                let capeTextureData = null;
+                let capeTextureWidth = 0;
+                let capeTextureHeight = 0;
+                if (capeImg) {
+                    const capeCanvas = document.createElement('canvas');
+                    capeCanvas.width = capeImg.width;
+                    capeCanvas.height = capeImg.height;
+                    const capeCtx = capeCanvas.getContext('2d', { willReadFrequently: true });
+                    if (capeCtx) {
+                        capeCtx.imageSmoothingEnabled = false;
+                        capeCtx.drawImage(capeImg, 0, 0);
+                        capeTextureWidth = capeImg.width;
+                        capeTextureHeight = capeImg.height;
+                        capeTextureData = capeCtx.getImageData(0, 0, capeTextureWidth, capeTextureHeight).data;
+                    }
+                }
+
+                if (capeTextureData) {
+                    const capeScaleX = capeTextureWidth / 64;
+                    const capeScaleY = capeTextureHeight / 32;
+                    const toCapeUvRect = (x, y, w, h) => toUvRect(x * capeScaleX, y * capeScaleY, w * capeScaleX, h * capeScaleY);
+
+                    parts.push({
+                        id: 'cape',
+                        x: 0,
+                        y: 12,
+                        z: -3.5,
+                        w: 10,
+                        h: 16,
+                        d: 1,
+                        uv: {
+                            top: toCapeUvRect(1, 0, 10, 1),
+                            bottom: toCapeUvRect(11, 0, 10, 1),
+                            left: toCapeUvRect(11, 1, 1, 16),
+                            front: toCapeUvRect(1, 1, 10, 16),
+                            right: toCapeUvRect(0, 1, 1, 16),
+                            back: toCapeUvRect(12, 1, 10, 16)
+                        },
+                        uvTransform: { bottom: { flipY: true } },
+                        textureSource: 'cape',
+                        localRotateY: Math.PI,
+                        localRotateX: 7.5 * Math.PI / 180
+                    });
+                }
+
+                const makeVertices = (part) => {
+                    const hx = part.w / 2;
+                    const hy = part.h / 2;
+                    const hz = part.d / 2;
+                    return {
+                        front: [
+                            { x: -hx, y: hy, z: hz },
+                            { x: hx, y: hy, z: hz },
+                            { x: hx, y: -hy, z: hz },
+                            { x: -hx, y: -hy, z: hz }
+                        ],
+                        back: [
+                            { x: hx, y: hy, z: -hz },
+                            { x: -hx, y: hy, z: -hz },
+                            { x: -hx, y: -hy, z: -hz },
+                            { x: hx, y: -hy, z: -hz }
+                        ],
+                        left: [
+                            { x: -hx, y: hy, z: -hz },
+                            { x: -hx, y: hy, z: hz },
+                            { x: -hx, y: -hy, z: hz },
+                            { x: -hx, y: -hy, z: -hz }
+                        ],
+                        right: [
+                            { x: hx, y: hy, z: hz },
+                            { x: hx, y: hy, z: -hz },
+                            { x: hx, y: -hy, z: -hz },
+                            { x: hx, y: -hy, z: hz }
+                        ],
+                        top: [
+                            { x: -hx, y: hy, z: -hz },
+                            { x: hx, y: hy, z: -hz },
+                            { x: hx, y: hy, z: hz },
+                            { x: -hx, y: hy, z: hz }
+                        ],
+                        bottom: [
+                            { x: -hx, y: -hy, z: hz },
+                            { x: hx, y: -hy, z: hz },
+                            { x: hx, y: -hy, z: -hz },
+                            { x: -hx, y: -hy, z: -hz }
+                        ]
+                    };
+                };
+
+                const rotateY = (v, angle) => {
+                    const cos = Math.cos(angle);
+                    const sin = Math.sin(angle);
+                    return {
+                        x: v.x * cos + v.z * sin,
+                        y: v.y,
+                        z: -v.x * sin + v.z * cos
+                    };
+                };
+
+                const rotateX = (v, angle) => {
+                    const cos = Math.cos(angle);
+                    const sin = Math.sin(angle);
+                    return {
+                        x: v.x,
+                        y: v.y * cos - v.z * sin,
+                        z: v.y * sin + v.z * cos
+                    };
+                };
+
+                const getTexel = (x, y) => {
+                    const tx = Math.floor(x);
+                    const ty = Math.floor(y);
+                    if (tx < 0 || tx >= textureWidth || ty < 0 || ty >= textureHeight) return null;
+                    const index = (ty * textureWidth + tx) * 4;
+                    const alpha = textureData[index + 3];
+                    if (alpha === 0) return null;
+                    return {
+                        r: textureData[index],
+                        g: textureData[index + 1],
+                        b: textureData[index + 2],
+                        a: alpha / 255
+                    };
+                };
+
+                const getCapeTexel = (x, y) => {
+                    if (!capeTextureData) return null;
+                    const tx = Math.floor(x);
+                    const ty = Math.floor(y);
+                    if (tx < 0 || tx >= capeTextureWidth || ty < 0 || ty >= capeTextureHeight) return null;
+                    const index = (ty * capeTextureWidth + tx) * 4;
+                    const alpha = capeTextureData[index + 3];
+                    if (alpha === 0) return null;
+                    return {
+                        r: capeTextureData[index],
+                        g: capeTextureData[index + 1],
+                        b: capeTextureData[index + 2],
+                        a: alpha / 255
+                    };
+                };
+
+                const bilerpPoint = (quad, u, v) => {
+                    const topX = quad[0].x + (quad[1].x - quad[0].x) * u;
+                    const topY = quad[0].y + (quad[1].y - quad[0].y) * u;
+                    const bottomX = quad[3].x + (quad[2].x - quad[3].x) * u;
+                    const bottomY = quad[3].y + (quad[2].y - quad[3].y) * u;
+                    return {
+                        x: topX + (bottomX - topX) * v,
+                        y: topY + (bottomY - topY) * v
+                    };
+                };
+
+                const quadArea = (quad) => {
+                    let area = 0;
+                    for (let i = 0; i < quad.length; i++) {
+                        const next = quad[(i + 1) % quad.length];
+                        area += quad[i].x * next.y - next.x * quad[i].y;
+                    }
+                    return Math.abs(area) * 0.5;
+                };
+
+                const drawPixelQuad = (quad, color) => {
+                    ctx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`;
+                    ctx.beginPath();
+                    ctx.moveTo(quad[0].x, quad[0].y);
+                    ctx.lineTo(quad[1].x, quad[1].y);
+                    ctx.lineTo(quad[2].x, quad[2].y);
+                    ctx.lineTo(quad[3].x, quad[3].y);
+                    ctx.closePath();
+                    ctx.fill();
+                };
+
+                const drawTexturedQuad = (uvRect, projectedQuad, uvTransform = null, textureSource = 'skin') => {
+                    if (!uvRect) return;
+                    const [u, v, w, h] = uvRect;
+                    const overlap = 0.18;
+                    const projectedArea = quadArea(projectedQuad);
+                    const sampleTexel = textureSource === 'cape' ? getCapeTexel : getTexel;
+                        // BOXパーツの場合はuvTransformでflipX/flipYを個別指定可能
+                        const flipX = uvTransform?.flipX === undefined ? true : !!uvTransform.flipX;
+                        const flipY = !!uvTransform?.flipY;
+                        if (projectedArea < 1.25) {
+                            const sampleX = flipX ? Math.floor((w - 1) * 0.5) : Math.floor((w - 1) * 0.5);
+                            const sampleY = flipY ? Math.floor((h - 1) * 0.5) : Math.floor((h - 1) * 0.5);
+                            const texel = sampleTexel(u + sampleX, v + sampleY);
+                            if (texel) {
+                                drawPixelQuad(projectedQuad, texel);
+                            }
+                            return;
+                        }
+                        for (let py = 0; py < h; py++) {
+                            for (let px = 0; px < w; px++) {
+                                const sampleX = flipX ? (w - 1 - px) : px;
+                                const sampleY = flipY ? (h - 1 - py) : py;
+                                const texel = sampleTexel(u + sampleX, v + sampleY);
+                                if (!texel) continue;
+
+                                const u0 = Math.max(0, (px - overlap) / w);
+                                const v0 = Math.max(0, (py - overlap) / h);
+                                const u1 = Math.min(1, (px + 1 + overlap) / w);
+                                const v1 = Math.min(1, (py + 1 + overlap) / h);
+
+                                const q0 = bilerpPoint(projectedQuad, u0, v0);
+                                const q1 = bilerpPoint(projectedQuad, u1, v0);
+                                const q2 = bilerpPoint(projectedQuad, u1, v1);
+                                const q3 = bilerpPoint(projectedQuad, u0, v1);
+
+                                drawPixelQuad([q0, q1, q2, q3], texel);
+                            }
+                        }
+                };
+
+                const fitCanvas = () => {
+                    const dpr = window.devicePixelRatio || 1;
+                    const width = Math.max(240, canvas.clientWidth || 300);
+                    const height = Math.max(230, canvas.clientHeight || 260);
+                    canvas.width = Math.floor(width * dpr);
+                    canvas.height = Math.floor(height * dpr);
+                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                    ctx.imageSmoothingEnabled = false;
+                };
+
+                fitCanvas();
+
+                let angleY = -0.65;
+                let angleX = -0.26;
+                const cameraDistance = 90;
+                const projection = 120;
+                let zoom = 3.9;
+                const minZoom = 2.2;
+                const maxZoom = 8.0;
+                // partsのy座標範囲から注視点を自動決定
+                if (parts.length > 0) {
+                    let minY = Infinity, maxY = -Infinity;
+                    parts.forEach(p => {
+                        minY = Math.min(minY, p.y - p.h/2);
+                        maxY = Math.max(maxY, p.y + p.h/2);
+                    });
+                    this.focusY = (minY + maxY) / 2;
+                }
+                let dragging = false;
+                let lastX = 0;
+                let lastY = 0;
+                let renderScheduled = false;
+
+                const renderScene = () => {
+                    renderScheduled = false;
+                    if (!document.body.contains(canvas)) {
+                        this.stopSkin3DAnimation(target);
+                        return;
+                    }
+
+                    const width = canvas.clientWidth || 300;
+                    const height = canvas.clientHeight || 260;
+                    ctx.clearRect(0, 0, width, height);
+
+                    const centerX = width / 2;
+                    const centerY = height / 2 + 6;
+
+                    const faces = [];
+
+                    const collectLayerFaces = (part, uvMap, uvTransformMap = null, expand = 0) => {
+                        if (!uvMap) return;
+                        const expanded = {
+                            x: part.x,
+                            y: part.y,
+                            z: part.z,
+                            w: part.w + expand,
+                            h: part.h + expand,
+                            d: part.d + expand
+                        };
+                        let partVertices = makeVertices(expanded);
+                        Object.entries(partVertices).forEach(([faceName, verts]) => {
+                            setTimeout(() => {
+                                if (part.id && part.id.startsWith('box_')) {
+                                    console.log('[BOX DRAW]', {
+                                        id: part.id,
+                                        face: faceName,
+                                        x: part.x, y: part.y, z: part.z, w: part.w, h: part.h, d: part.d,
+                                        uv: uvMap[faceName],
+                                        uvTransform: uvTransformMap ? uvTransformMap[faceName] : null
+                                    });
+                                }
+                            }, 0);
+                            let vertsToUse = verts;
+                            const transformed = vertsToUse.map(v => {
+                                let localVertex = v;
+                                if (part.localRotateY) {
+                                    localVertex = rotateY(localVertex, part.localRotateY);
+                                }
+                                if (part.localRotateX) {
+                                    localVertex = rotateX(localVertex, part.localRotateX);
+                                }
+                                const withOffset = { x: localVertex.x + part.x, y: localVertex.y + part.y - this.focusY, z: localVertex.z + part.z };
+                                const rotatedY = rotateY(withOffset, this.angleY);
+                                const rotatedX = rotateX(rotatedY, this.angleX);
+                                const z = rotatedX.z + cameraDistance;
+                                const scale = projection / z;
+                                return {
+                                    x: centerX + rotatedX.x * scale * this.zoom,
+                                    y: centerY - rotatedX.y * scale * this.zoom,
+                                    z: z
+                                };
+                            });
+
+                            const vA = transformed[0];
+                            const vB = transformed[1];
+                            const vC = transformed[2];
+                            const cross = (vB.x - vA.x) * (vC.y - vA.y) - (vB.y - vA.y) * (vC.x - vA.x);
+                            const projectedArea = quadArea(transformed);
+                            if (cross < 0 || projectedArea < 1.25) {
+                                // bottom面は必ず上下反転
+                                let uvTrans = uvTransformMap ? uvTransformMap[faceName] : null;
+                                if (faceName === 'bottom') {
+                                    uvTrans = { ...(uvTrans || {}), flipY: true };
+                                }
+                                faces.push({
+                                    points: transformed,
+                                    uv: uvMap[faceName],
+                                    uvTransform: uvTrans,
+                                    textureSource: part.textureSource || 'skin',
+                                    z: transformed.reduce((sum, p) => sum + p.z, 0) / 4
+                                });
+                            }
+                        });
+                    };
+
+                    const showFirst = this.showFirstLayer !== false;
+                    const showSecond = this.showSecondLayer !== false;
+                    const showCape = previewMode === 'cape' ? true : this.showCapeLayer !== false;
+                    const showCustomBoxes = previewMode === 'cape' ? false : this.showCustomBoxes !== false;
+                    parts.forEach(part => {
+                        if (previewMode === 'cape' && part.id !== 'cape') {
+                            return;
+                        }
+                        if (part.id === 'cape') {
+                            if (showCape) {
+                                collectLayerFaces(part, part.uv, part.uvTransform, 0);
+                            }
+                            return;
+                        }
+                        if (part.id && part.id.startsWith('box_')) {
+                            if (!showCustomBoxes) {
+                                return;
+                            }
+                            collectLayerFaces(part, part.uv, part.uvTransform, 0);
+                            // セカンドレイヤー該当BOXは必ずexpand=0.125*part.w
+                            const secondLayerIds = ['box_HEADWEAR','box_JACKET','box_SLEEVE0','box_SLEEVE1','box_PANTS0','box_PANTS1','box_WAIST','box_LEGGING0','box_LEGGING1','box_SOCK0','box_SOCK1','box_BOOT0','box_BOOT1','box_ARMARMOR0','box_ARMARMOR1','box_BODYARMOR','box_BODYARMOR0','box_BODYARMOR1','box_BELT'];
+                            const expand = secondLayerIds.includes(part.id) ? (0.125 * (part.w || 0)) : (part.outerExpand ? (part.outerExpand * (part.w || 0)) : 0);
+                            collectLayerFaces(part, part.outerUv, part.outerUvTransform, expand);
+                        } else {
+                            const baseHidden = !!(animInfo?.flags && part.disableKey && animInfo.flags[part.disableKey]);
+                            if (!baseHidden && showFirst) {
+                                collectLayerFaces(part, part.uv, part.uvTransform, 0);
+                            }
+                            const overlayHiddenByAnim = !!(animInfo?.flags && part.overlayDisableKey && animInfo.flags[part.overlayDisableKey]);
+                            const overlayHidden = baseHidden || isLegacySkin || overlayHiddenByAnim;
+                            if (!overlayHidden && showSecond) {
+                                const expand = part.outerExpand ? (part.outerExpand * (part.w || 0)) : 0;
+                                collectLayerFaces(part, part.outerUv, part.outerUvTransform, expand);
+                            }
+                        }
+                    });
+
+                    faces.sort((a, b) => b.z - a.z);
+                    faces.forEach(face => {
+                        drawTexturedQuad(face.uv, face.points, face.uvTransform, face.textureSource);
+                    });
+                };
+
+                const scheduleRender = () => {
+                    if (renderScheduled) return;
+                    renderScheduled = true;
+                    const frameId = requestAnimationFrame(renderScene);
+                    if (target === 'import') {
+                        this.importSkin3dFrame = frameId;
+                    } else {
+                        this.assetSkin3dFrame = frameId;
+                    }
+                };
+
+                const onPointerDown = (e) => {
+                    dragging = true;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                    canvas.classList.add('dragging');
+                    canvas.setPointerCapture(e.pointerId);
+                };
+
+                const onPointerMove = (e) => {
+                    if (!dragging) return;
+                    const dx = e.clientX - lastX;
+                    const dy = e.clientY - lastY;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+
+                    this.angleY += dx * 0.01;
+                    this.angleX += dy * 0.01;
+                    this.angleX = Math.max(-1.15, Math.min(0.35, this.angleX));
+                    scheduleRender();
+                };
+
+                const endDrag = (e) => {
+                    if (!dragging) return;
+                    dragging = false;
+                    canvas.classList.remove('dragging');
+                    try {
+                        if (e && typeof e.pointerId === 'number') {
+                            canvas.releasePointerCapture(e.pointerId);
+                        }
+                    } catch (_) {}
+                };
+
+                const onResize = () => {
+                    fitCanvas();
+                    scheduleRender();
+                };
+
+                const onWheel = (e) => {
+                    e.preventDefault();
+                    const zoomFactor = Math.exp(-e.deltaY * 0.0015);
+                    this.zoom = Math.max(minZoom, Math.min(maxZoom, this.zoom * zoomFactor));
+                    scheduleRender();
+                };
+
+                canvas.addEventListener('pointerdown', onPointerDown);
+                canvas.addEventListener('pointermove', onPointerMove);
+                canvas.addEventListener('pointerup', endDrag);
+                canvas.addEventListener('pointercancel', endDrag);
+                canvas.addEventListener('pointerleave', endDrag);
+                canvas.addEventListener('wheel', onWheel, { passive: false });
+                window.addEventListener('resize', onResize);
+
+                const cleanup = () => {
+                    canvas.removeEventListener('pointerdown', onPointerDown);
+                    canvas.removeEventListener('pointermove', onPointerMove);
+                    canvas.removeEventListener('pointerup', endDrag);
+                    canvas.removeEventListener('pointercancel', endDrag);
+                    canvas.removeEventListener('pointerleave', endDrag);
+                    canvas.removeEventListener('wheel', onWheel);
+                    window.removeEventListener('resize', onResize);
+                };
+
+                if (target === 'import') {
+                    this.importSkin3dCleanup = cleanup;
+                } else {
+                    this.assetSkin3dCleanup = cleanup;
+                }
+
+                scheduleRender();
             }
 
             displayDetails(asset) {
@@ -3444,7 +4960,11 @@
                 document.getElementById('skinModelInput').value = 'steve';
                 document.getElementById('capeFileInput').value = '';
                 document.getElementById('skinPreviewArea').style.display = 'none';
+                document.getElementById('skinPreviewArea').innerHTML = '';
                 document.getElementById('capePreviewArea').style.display = 'none';
+                this.selectedSkinData = null;
+                this.selectedSkinDataUrl = null;
+                this.stopSkin3DAnimation('import');
                 modal.classList.add('active');
             }
 
@@ -3471,11 +4991,7 @@
                 } else {
                     html = items.map((item, idx) => {
                         const anim = item.properties?.find(p => p.key === 'ANIM')?.value || '-';
-                        let modelType = 'Unknown';
-                        if (anim) {
-                            if (anim === '0x00080000' || anim === '524288') modelType = 'Alex';
-                            else if (anim === '0x00040000' || anim === '262144') modelType = 'Steve';
-                        }
+                        const modelType = this.getSkinAnimInfoFromAnim(anim).modelLabel;
                         
                         // ディレクトリを含むファイルパスの処理
                         let filenameHtml = '';
@@ -3522,7 +5038,7 @@
                 if (!selected) return;
 
                 // スキン選択後の処理
-                alert(`${type === 'skin' ? 'スキン' : 'マント'}を選択しました: ${filename}\\n(実装予定)`);
+                this.showNotice(`${type === 'skin' ? 'スキン' : 'マント'}を選択しました: ${filename}\\n(実装予定)`, 'info', 3200);
                 this.closeSkinModal();
             }
 
@@ -3642,7 +5158,7 @@
                 }
             }
 
-            deleteFolder(data, parentPckInfo) {
+            async deleteFolder(data, parentPckInfo) {
                 // 親PCK情報を取得
                 const actualParentPckInfo = parentPckInfo || data.parentPckInfo || (data.node && data.node._parentPckInfo);
                 
@@ -3698,7 +5214,10 @@
                 
                 // 確認ダイアログ
                 const fileCount = filesToDelete.length;
-                if (!confirm(`フォルダ "${folderPath}" とその中の ${fileCount} 個のファイルを削除してもいいですか？`)) {
+                if (!await this.showConfirm(`フォルダ "${folderPath}" とその中の ${fileCount} 個のファイルを削除してもいいですか？`, {
+                    title: 'フォルダ削除の確認',
+                    confirmText: '削除'
+                })) {
                     return;
                 }
                 
@@ -3771,8 +5290,12 @@
                 alert(`フォルダ "${folderPath}" と ${fileCount} 個のファイルを削除しました`);
             }
 
-            createNewFolder(data) {
-                const folderName = prompt('新しいフォルダ名を入力してください:');
+            async createNewFolder(data) {
+                const folderName = await this.showPrompt('新しいフォルダ名を入力してください', '', {
+                    title: 'フォルダを作成',
+                    placeholder: 'new_folder',
+                    confirmText: '作成'
+                });
                 if (!folderName || folderName.trim() === '') return;
                 
                 const trimmedName = folderName.trim();
@@ -3881,12 +5404,32 @@
                     // Base64エンコード
                     const base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(e.target.result)));
                     const dataUrl = 'data:image/png;base64,' + base64;
-                    
-                    // プレビュー表示
-                    document.getElementById('skinPreview').src = dataUrl;
-                    document.getElementById('skinPreviewArea').style.display = 'block';
+                    this.selectedSkinDataUrl = dataUrl;
+
+                    this.updateImportSkinPreview3D();
                 };
                 reader.readAsArrayBuffer(file);
+            }
+
+            updateImportSkinPreview3D() {
+                if (!this.selectedSkinDataUrl) return;
+
+                const container = document.getElementById('skinPreviewArea');
+                if (!container) return;
+
+                const modelType = document.getElementById('skinModelInput').value === 'alex' ? 'alex' : 'steve';
+                const animInfo = this.buildAnimInfoForModel(modelType);
+
+                const img = new Image();
+                img.onload = () => {
+                    this.renderSkinDualPreview(container, this.selectedSkinDataUrl, img, animInfo, 'import');
+                    container.style.display = 'block';
+                };
+                img.onerror = () => {
+                    container.innerHTML = '<div class="empty-message"><div class="empty-icon">🖼️</div>画像の表示に失敗しました</div>';
+                    container.style.display = 'block';
+                };
+                img.src = this.selectedSkinDataUrl;
             }
 
             handleCapeFileSelect(file) {
@@ -3919,7 +5462,7 @@
                 reader.readAsArrayBuffer(file);
             }
 
-            addSkinToPackage() {
+            async addSkinToPackage() {
                 if (!this.selectedSkinData) {
                     alert('スキムファイルを選択してください');
                     return;
@@ -3928,14 +5471,20 @@
                 // スキンサイズチェック（0x7FFF = 32767バイト）
                 const MAX_SIZE = 0x7FFF;
                 if (this.selectedSkinData.byteLength > MAX_SIZE) {
-                    if (!confirm(`⚠️ 警告: スキンのサイズが ${this.selectedSkinData.byteLength} バイト（0x${this.selectedSkinData.byteLength.toString(16).toUpperCase()}）です。\n\n0x7FFF（${MAX_SIZE}バイト）を超えるスキンはゲーム内でクラッシュする可能性があります。\n\nそれでも追加しますか？`)) {
+                    if (!await this.showConfirm(`警告: スキンのサイズが ${this.selectedSkinData.byteLength} バイト（0x${this.selectedSkinData.byteLength.toString(16).toUpperCase()}）です。\n\n0x7FFF（${MAX_SIZE}バイト）を超えるスキンはゲーム内でクラッシュする可能性があります。\n\nそれでも追加しますか？`, {
+                        title: 'スキンサイズ警告',
+                        confirmText: '続行'
+                    })) {
                         return;
                     }
                 }
 
                 // マントサイズチェック
                 if (this.selectedCapeData && this.selectedCapeData.byteLength > MAX_SIZE) {
-                    if (!confirm(`⚠️ 警告: マントのサイズが ${this.selectedCapeData.byteLength} バイト（0x${this.selectedCapeData.byteLength.toString(16).toUpperCase()}）です。\n\n0x7FFF（${MAX_SIZE}バイト）を超えるマントはゲーム内でクラッシュする可能性があります。\n\nそれでも追加しますか？`)) {
+                    if (!await this.showConfirm(`警告: マントのサイズが ${this.selectedCapeData.byteLength} バイト（0x${this.selectedCapeData.byteLength.toString(16).toUpperCase()}）です。\n\n0x7FFF（${MAX_SIZE}バイト）を超えるマントはゲーム内でクラッシュする可能性があります。\n\nそれでも追加しますか？`, {
+                        title: 'マントサイズ警告',
+                        confirmText: '続行'
+                    })) {
                         return;
                     }
                 }
@@ -4367,8 +5916,10 @@
                 const modal = document.getElementById('importModal');
                 modal.classList.remove('active');
                 this.selectedSkinData = null;
+                this.selectedSkinDataUrl = null;
                 this.selectedCapeData = null;
                 this.selectedCapeName = null;
+                this.stopSkin3DAnimation('import');
             }
 
             generateSkinId() {
@@ -4403,11 +5954,9 @@
             // ========== プロパティ編集機能 ==========
             updateProperty(input) {
                 if (!this.selectedAsset) return;
-                
                 const index = parseInt(input.dataset.index);
                 const type = input.dataset.type;
                 const value = input.value.trim();
-                
                 if (type === 'key') {
                     if (!value) {
                         alert('キーは空にできません');
@@ -4418,17 +5967,35 @@
                 } else if (type === 'value') {
                     this.selectedAsset.properties[index].value = value;
                 }
-                
+                // ネストPCK内アセットの場合、親PCKを再エンコード
+                if (this.selectedAsset._parentPckInfo && this.selectedAsset._childIndex !== undefined) {
+                    const parentPckAsset = this.selectedAsset._parentPckInfo.asset;
+                    const childAssets = this.parsePckAsset(parentPckAsset);
+                    childAssets[this.selectedAsset._childIndex] = this.selectedAsset;
+                    const originalPckType = parentPckAsset.typeCode === 5 ? 3 : (parentPckAsset.typeCode === 8 ? 4 : 5);
+                    const originalLittleEndian = this.parser ? this.parser.littleEndian : false;
+                    const updatedPckBuffer = this.encodePck(childAssets, originalPckType, originalLittleEndian);
+                    parentPckAsset.data = new Uint8Array(updatedPckBuffer);
+                    parentPckAsset.dataSize = updatedPckBuffer.byteLength;
+                    // assets配列内の該当PCKアセットも更新
+                    const idx = this.assets.findIndex(a => a === parentPckAsset);
+                    if (idx !== -1) {
+                        this.assets[idx] = parentPckAsset;
+                    }
+                }
                 // 保存ボタンを有効化
                 document.getElementById('menuSave').style.opacity = '1';
                 document.getElementById('menuSave').style.pointerEvents = 'auto';
             }
 
-            deleteAsset(index, parentPckInfo, childIndex, assetToDelete) {
+            async deleteAsset(index, parentPckInfo, childIndex, assetToDelete) {
                 // ネストされたPCK内のアセットの場合
                 if (parentPckInfo && childIndex !== undefined && assetToDelete) {
                     const asset = assetToDelete;
-                    if (!confirm(`アセット ${this.escapeHtml(asset.filename)} を削除してもいいですか？`)) {
+                    if (!await this.showConfirm(`アセット ${asset.filename} を削除してもいいですか？`, {
+                        title: 'アセット削除の確認',
+                        confirmText: '削除'
+                    })) {
                         return;
                     }
                     
@@ -4477,7 +6044,10 @@
                 } else {
                     // メインのassetsから削除（従来の処理）
                     const asset = this.assets[index];
-                    if (!confirm(`アセット [${index}] ${this.escapeHtml(asset.filename)} を削除してもいいですか？`)) {
+                    if (!await this.showConfirm(`アセット [${index}] ${asset.filename} を削除してもいいですか？`, {
+                        title: 'アセット削除の確認',
+                        confirmText: '削除'
+                    })) {
                         return;
                     }
                     
@@ -4557,41 +6127,68 @@
                 }
             }
 
-            deleteProperty(index) {
+            async deleteProperty(index) {
                 if (!this.selectedAsset) return;
-                
                 const key = this.selectedAsset.properties[index].key;
-                if (!confirm(`プロパティ「${key}」を削除してもいいですか？`)) {
+                if (!await this.showConfirm(`プロパティ「${key}」を削除してもいいですか？`, {
+                    title: 'プロパティ削除の確認',
+                    confirmText: '削除'
+                })) {
                     return;
                 }
-                
                 this.selectedAsset.properties.splice(index, 1);
-                
+                // ネストPCK内アセットの場合、親PCKを再エンコード
+                if (this.selectedAsset._parentPckInfo && this.selectedAsset._childIndex !== undefined) {
+                    const parentPckAsset = this.selectedAsset._parentPckInfo.asset;
+                    const childAssets = this.parsePckAsset(parentPckAsset);
+                    childAssets[this.selectedAsset._childIndex] = this.selectedAsset;
+                    const originalPckType = parentPckAsset.typeCode === 5 ? 3 : (parentPckAsset.typeCode === 8 ? 4 : 5);
+                    const originalLittleEndian = this.parser ? this.parser.littleEndian : false;
+                    const updatedPckBuffer = this.encodePck(childAssets, originalPckType, originalLittleEndian);
+                    parentPckAsset.data = new Uint8Array(updatedPckBuffer);
+                    parentPckAsset.dataSize = updatedPckBuffer.byteLength;
+                    // assets配列内の該当PCKアセットも更新
+                    const idx = this.assets.findIndex(a => a === parentPckAsset);
+                    if (idx !== -1) {
+                        this.assets[idx] = parentPckAsset;
+                    }
+                }
                 // 保存ボタンを有効化
                 document.getElementById('menuSave').style.opacity = '1';
                 document.getElementById('menuSave').style.pointerEvents = 'auto';
-                
                 // 詳細を再描画
                 this.displayDetails(this.selectedAsset);
             }
 
             addProperty() {
                 if (!this.selectedAsset) return;
-                
                 if (!this.selectedAsset.properties) {
                     this.selectedAsset.properties = [];
                 }
-                
                 // 新しいプロパティを追加
                 this.selectedAsset.properties.push({
                     key: 'KEY',
                     value: 'VALUE'
                 });
-                
+                // ネストPCK内アセットの場合、親PCKを再エンコード
+                if (this.selectedAsset._parentPckInfo && this.selectedAsset._childIndex !== undefined) {
+                    const parentPckAsset = this.selectedAsset._parentPckInfo.asset;
+                    const childAssets = this.parsePckAsset(parentPckAsset);
+                    childAssets[this.selectedAsset._childIndex] = this.selectedAsset;
+                    const originalPckType = parentPckAsset.typeCode === 5 ? 3 : (parentPckAsset.typeCode === 8 ? 4 : 5);
+                    const originalLittleEndian = this.parser ? this.parser.littleEndian : false;
+                    const updatedPckBuffer = this.encodePck(childAssets, originalPckType, originalLittleEndian);
+                    parentPckAsset.data = new Uint8Array(updatedPckBuffer);
+                    parentPckAsset.dataSize = updatedPckBuffer.byteLength;
+                    // assets配列内の該当PCKアセットも更新
+                    const idx = this.assets.findIndex(a => a === parentPckAsset);
+                    if (idx !== -1) {
+                        this.assets[idx] = parentPckAsset;
+                    }
+                }
                 // 保存ボタンを有効化
                 document.getElementById('menuSave').style.opacity = '1';
                 document.getElementById('menuSave').style.pointerEvents = 'auto';
-                
                 // 詳細を再描画
                 this.displayDetails(this.selectedAsset);
             }
@@ -4688,7 +6285,22 @@
             console.log('DOM loaded, initializing viewer...');
             viewer = new PckViewer();
             window.viewer = viewer; // グローバルに明示的に公開
+            const originalAlert = window.alert.bind(window);
+            window.alert = (message) => {
+                if (window.viewer && typeof window.viewer.showNotice === 'function') {
+                    window.viewer.showNotice(message);
+                    return;
+                }
+                originalAlert(message);
+            };
+            viewer.setupEventListeners();
             console.log('Viewer initialized');
+
+            // メニューイベントをaddEventListenerでバインド
+            document.getElementById('menuNew').addEventListener('click', () => viewer.showNewPackageDialog());
+            document.getElementById('menuOpen').addEventListener('click', () => viewer.openFile());
+            document.getElementById('menuSave').addEventListener('click', () => viewer.saveFile());
+            document.getElementById('menuClose').addEventListener('click', () => viewer.closeFile());
 
             // モーダルの外側をクリックで閉じる
             document.getElementById('skinModal').addEventListener('click', (e) => {
@@ -4696,7 +6308,6 @@
                     viewer.closeSkinModal();
                 }
             });
-            
             // 保存ダイアログの外側をクリックで閉じる
             document.getElementById('saveDialogOverlay').addEventListener('click', (e) => {
                 if (e.target.id === 'saveDialogOverlay') {
